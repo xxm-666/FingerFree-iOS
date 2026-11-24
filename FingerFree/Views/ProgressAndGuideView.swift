@@ -48,6 +48,17 @@ struct ProgressAndGuideView: View {
                 }
 
                 Section("训练偏好") {
+                    Picker("节拍器音色", selection: $store.metronomeSound) {
+                        ForEach(MetronomeSound.allCases) { timbre in
+                            Text(timbre.displayName).tag(timbre)
+                        }
+                    }
+                    Toggle("开始前 4 拍预备拍 (1-2-3-4)", isOn: $store.countInEnabled)
+                    Picker("第 2 阶段爬格子指型", selection: $store.spiderPattern) {
+                        ForEach(SpiderPattern.allCases) { pattern in
+                            Text("\(pattern.rawValue) (\(pattern.badgeText))").tag(pattern)
+                        }
+                    }
                     Picker("第 4 阶段 F 和弦指法", selection: $store.fChordStyle) {
                         ForEach(FChordStyle.allCases) { style in
                             Text(style.rawValue).tag(style)

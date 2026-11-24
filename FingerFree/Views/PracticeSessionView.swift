@@ -28,6 +28,10 @@ struct PracticeSessionView: View {
     @State private var showCompletionSheet: Bool = false
     @State private var showRequirementDetail: Bool = false
 
+    // Stage transition rest/prep state
+    @State private var pendingNextIndex: Int?
+    @State private var transitionCountdown: Int = 10
+
     // Post-session assessment
     @State private var zeroMistakesTwoMinutes: Bool = false
     @State private var noForearmTension: Bool = false
@@ -60,18 +64,21 @@ struct PracticeSessionView: View {
                 .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 15) {
                         stageProgressHeader
                         timerAndBeatCard
                         StageVisualizerView(
                             stage: currentStage,
                             currentBeat: metronome.currentBeat,
                             totalBeatCount: metronome.totalBeatCount,
-                            isRunning: metronome.isRunning,
-                            fChordStyle: store.fChordStyle
+                            isRunning: metronome.isRunning && !metronome.isCountingIn,
+                            fChordStyle: store.fChordStyle,
+                            spiderPattern: store.spiderPattern
                         )
 
-                        if currentStage == .chordTransition {
+                        if currentStage == .spiderWalk {
+                            spiderPatternPicker
+                        } else if currentStage == .chordTransition {
                             fChordStylePicker
                         }
 
@@ -82,13 +89,20 @@ struct PracticeSessionView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 }
+
+                if let nextIdx = pendingNextIndex {
+                    stageTransitionOverlay(nextStage: config.stages[nextIdx], nextIndex: nextIdx)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
             }
+            .animation(.easeInOut(duration: 0.22), value: pendingNextIndex != nil)
             .navigationTitle("阶段 \(currentStage.index)/\(config.stages.count) · \(currentStage.phaseTitle)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("结束") {
                         metronome.stop()
+                        pendingNextIndex = nil
                         if elapsedTotalSeconds >= 20 {
                             showCompletionSheet = true
                         } else {
@@ -106,6 +120,7 @@ struct PracticeSessionView: View {
             }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
+                syncMetronomePreferences()
                 loadStage(at: 0, autoStart: false)
             }
             .onDisappear {
@@ -113,7 +128,16 @@ struct PracticeSessionView: View {
                 metronome.stop()
             }
             .onReceive(secondTimer) { _ in
-                guard metronome.isRunning else { return }
+                if let nextIdx = pendingNextIndex {
+                    if transitionCountdown > 1 {
+                        transitionCountdown -= 1
+                    } else {
+                        beginPendingStage(at: nextIdx)
+                    }
+                    return
+                }
+
+                guard metronome.isRunning && !metronome.isCountingIn else { return }
                 elapsedTotalSeconds += 1
                 if remainingSeconds > 1 {
                     remainingSeconds -= 1
@@ -168,12 +192,22 @@ struct PracticeSessionView: View {
         VStack(spacing: 12) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("本阶段剩余")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(formatTime(remainingSeconds))
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
-                        .monospacedDigit()
+                    if metronome.isCountingIn {
+                        Text("预备拍 · 摆好手型")
+                            .font(.caption.bold())
+                            .foregroundStyle(.orange)
+                        Text("预备 \(max(1, metronome.countInBeat)) / 4")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundStyle(.orange)
+                            .monospacedDigit()
+                    } else {
+                        Text("本阶段剩余")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(formatTime(remainingSeconds))
+                            .font(.system(size: 38, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    }
                 }
 
                 Spacer()
@@ -181,14 +215,19 @@ struct PracticeSessionView: View {
                 // 4/4 Beat LED indicator
                 HStack(spacing: 10) {
                     ForEach(1...4, id: \.self) { beat in
-                        let isLit = metronome.isRunning && metronome.currentBeat == beat
+                        let isCountInLit = metronome.isCountingIn && metronome.countInBeat == beat
+                        let isPlayLit = metronome.isRunning && !metronome.isCountingIn && metronome.currentBeat == beat
+                        let isLit = isCountInLit || isPlayLit
                         let isAccent = (beat == 1)
+
                         VStack(spacing: 4) {
                             Circle()
                                 .fill(
-                                    isLit
-                                        ? (isAccent ? currentStage.accentColor : Color.primary)
-                                        : Color.primary.opacity(0.12)
+                                    isCountInLit
+                                        ? Color.orange
+                                        : isPlayLit
+                                            ? (isAccent ? currentStage.accentColor : Color.primary)
+                                            : Color.primary.opacity(0.12)
                                 )
                                 .frame(width: isAccent ? 24 : 20, height: isAccent ? 24 : 20)
                                 .scaleEffect(isLit ? 1.18 : 1.0)
@@ -202,14 +241,37 @@ struct PracticeSessionView: View {
             }
 
             ProgressView(value: stageProgress)
-                .tint(currentStage.accentColor)
+                .tint(metronome.isCountingIn ? .orange : currentStage.accentColor)
         }
         .padding(16)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                .strokeBorder(
+                    metronome.isCountingIn ? Color.orange.opacity(0.4) : Color.primary.opacity(0.08),
+                    lineWidth: 1
+                )
         )
+    }
+
+    private var spiderPatternPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("爬格子指型")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(store.spiderPattern.badgeText)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(TrainingStageKind.spiderWalk.accentColor)
+            }
+            Picker("爬格子指型", selection: $store.spiderPattern) {
+                ForEach(SpiderPattern.allCases) { pattern in
+                    Text(pattern.rawValue).tag(pattern)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
     }
 
     private var fChordStylePicker: some View {
@@ -260,6 +322,55 @@ struct PracticeSessionView: View {
                 }
             }
 
+            // Smooth BPM slider
+            Slider(
+                value: Binding(
+                    get: { Double(metronome.bpm) },
+                    set: { newVal in
+                        let rounded = Int(newVal.rounded())
+                        metronome.bpm = rounded
+                        store.setBPM(rounded, for: currentStage)
+                    }
+                ),
+                in: 30...140,
+                step: 1
+            )
+            .tint(currentStage.accentColor)
+
+            // Metronome timbre selector with live audition
+            VStack(alignment: .leading, spacing: 6) {
+                Text("节拍音色（点击试听切换）")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(MetronomeSound.allCases) { timbre in
+                            let selected = store.metronomeSound == timbre
+                            Button {
+                                store.metronomeSound = timbre
+                                metronome.preview(sound: timbre)
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: timbre.iconName)
+                                        .font(.caption2)
+                                    Text(timbre.displayName)
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 7)
+                                .background(
+                                    selected ? currentStage.accentColor : Color.primary.opacity(0.07),
+                                    in: Capsule()
+                                )
+                                .foregroundStyle(selected ? .white : .primary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
             // Prominent "-10 BPM" emergency tension drop button
             Button {
                 metronome.dropTenBPM()
@@ -299,12 +410,12 @@ struct PracticeSessionView: View {
             }
             .buttonStyle(.plain)
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Toggle(isOn: Binding(
                     get: { !metronome.isMuted },
                     set: { metronome.isMuted = !$0 }
                 )) {
-                    Label("节拍声", systemImage: metronome.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    Label("声音", systemImage: metronome.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                         .font(.caption.weight(.medium))
                 }
                 .toggleStyle(.button)
@@ -317,11 +428,24 @@ struct PracticeSessionView: View {
                         metronome.hapticsEnabled = $0
                     }
                 )) {
-                    Label("触觉节拍", systemImage: "iphone.radiowaves.left.and.right")
+                    Label("震动", systemImage: "iphone.radiowaves.left.and.right")
                         .font(.caption.weight(.medium))
                 }
                 .toggleStyle(.button)
                 .tint(currentStage.accentColor)
+
+                Toggle(isOn: Binding(
+                    get: { store.countInEnabled },
+                    set: {
+                        store.countInEnabled = $0
+                        metronome.countInEnabled = $0
+                    }
+                )) {
+                    Label("4拍预备", systemImage: "123.rectangle.fill")
+                        .font(.caption.weight(.medium))
+                }
+                .toggleStyle(.button)
+                .tint(.orange)
 
                 Spacer()
             }
@@ -353,7 +477,7 @@ struct PracticeSessionView: View {
             if config.stages.count > 1 {
                 Button {
                     guard currentIndex > 0 else { return }
-                    loadStage(at: currentIndex - 1, autoStart: metronome.isRunning)
+                    loadStage(at: currentIndex - 1, autoStart: false)
                 } label: {
                     Image(systemName: "backward.end.fill")
                         .font(.title3)
@@ -383,7 +507,7 @@ struct PracticeSessionView: View {
             if config.stages.count > 1 {
                 Button {
                     if currentIndex + 1 < config.stages.count {
-                        loadStage(at: currentIndex + 1, autoStart: metronome.isRunning)
+                        enterTransition(to: currentIndex + 1)
                     } else {
                         metronome.stop()
                         showCompletionSheet = true
@@ -395,6 +519,60 @@ struct PracticeSessionView: View {
                         .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
             }
+        }
+    }
+
+    // MARK: - Stage Transition Overlay
+
+    private func stageTransitionOverlay(nextStage: TrainingStageKind, nextIndex: Int) -> some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+
+            VStack(spacing: 18) {
+                ZStack {
+                    Circle()
+                        .fill(nextStage.accentColor.opacity(0.18))
+                        .frame(width: 68, height: 68)
+                    Image(systemName: nextStage.symbolName)
+                        .font(.title)
+                        .foregroundStyle(nextStage.accentColor)
+                }
+
+                VStack(spacing: 6) {
+                    Text("即将进入阶段 \(nextStage.index) · \(nextStage.phaseTitle)")
+                        .font(.headline)
+                        .foregroundStyle(nextStage.accentColor)
+                    Text(nextStage.exerciseName)
+                        .font(.title3.bold())
+                    Text(nextStage.transitionPrompt)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
+                }
+
+                Text("\(transitionCountdown) 秒后自动开始")
+                    .font(.caption.bold().monospacedDigit())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.08), in: Capsule())
+
+                Button {
+                    beginPendingStage(at: nextIndex)
+                } label: {
+                    Text("已就位，立即开始")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(nextStage.accentColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(.horizontal, 24)
         }
     }
 
@@ -499,19 +677,33 @@ struct PracticeSessionView: View {
 
     // MARK: - Helpers
 
+    private func syncMetronomePreferences() {
+        metronome.sound = store.metronomeSound
+        metronome.hapticsEnabled = store.hapticsEnabled
+        metronome.countInEnabled = store.countInEnabled
+    }
+
     private func loadStage(at index: Int, autoStart: Bool) {
         currentIndex = index
         let stage = config.stages[index]
         remainingSeconds = stage.durationSeconds
-        metronome.hapticsEnabled = store.hapticsEnabled
+        syncMetronomePreferences()
         metronome.bpm = store.bpm(for: stage)
+        metronome.stop()
         if autoStart {
-            if !metronome.isRunning {
-                metronome.start()
-            }
-        } else {
-            metronome.stop()
+            metronome.start(withCountIn: store.countInEnabled)
         }
+    }
+
+    private func enterTransition(to nextIndex: Int) {
+        metronome.stop()
+        transitionCountdown = 10
+        pendingNextIndex = nextIndex
+    }
+
+    private func beginPendingStage(at nextIndex: Int) {
+        pendingNextIndex = nil
+        loadStage(at: nextIndex, autoStart: true)
     }
 
     private func handleStageCompleted() {
@@ -520,7 +712,7 @@ struct PracticeSessionView: View {
         generator.notificationOccurred(.success)
 
         if currentIndex + 1 < config.stages.count {
-            loadStage(at: currentIndex + 1, autoStart: true)
+            enterTransition(to: currentIndex + 1)
         } else {
             metronome.stop()
             showCompletionSheet = true

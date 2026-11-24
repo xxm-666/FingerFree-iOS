@@ -15,11 +15,23 @@ final class PracticeStore: ObservableObject {
     @Published var hapticsEnabled: Bool {
         didSet { UserDefaults.standard.set(hapticsEnabled, forKey: Self.hapticsKey) }
     }
+    @Published var metronomeSound: MetronomeSound {
+        didSet { UserDefaults.standard.set(metronomeSound.rawValue, forKey: Self.soundKey) }
+    }
+    @Published var countInEnabled: Bool {
+        didSet { UserDefaults.standard.set(countInEnabled, forKey: Self.countInKey) }
+    }
+    @Published var spiderPattern: SpiderPattern {
+        didSet { UserDefaults.standard.set(spiderPattern.rawValue, forKey: Self.spiderPatternKey) }
+    }
 
     private static let bpmsKey = "fingerfree_stage_bpms_v1"
     private static let recordsKey = "fingerfree_records_v1"
     private static let fChordKey = "fingerfree_f_chord_style_v1"
     private static let hapticsKey = "fingerfree_haptics_enabled_v1"
+    private static let soundKey = "fingerfree_metronome_sound_v1"
+    private static let countInKey = "fingerfree_count_in_enabled_v1"
+    private static let spiderPatternKey = "fingerfree_spider_pattern_v1"
 
     init() {
         var loadedBPMs: [TrainingStageKind: Int] = [:]
@@ -52,6 +64,26 @@ final class PracticeStore: ObservableObject {
             self.hapticsEnabled = true
         } else {
             self.hapticsEnabled = UserDefaults.standard.bool(forKey: Self.hapticsKey)
+        }
+
+        if let rawSound = UserDefaults.standard.string(forKey: Self.soundKey),
+           let sound = MetronomeSound(rawValue: rawSound) {
+            self.metronomeSound = sound
+        } else {
+            self.metronomeSound = .warmWoodblock
+        }
+
+        if UserDefaults.standard.object(forKey: Self.countInKey) == nil {
+            self.countInEnabled = true
+        } else {
+            self.countInEnabled = UserDefaults.standard.bool(forKey: Self.countInKey)
+        }
+
+        if let rawPattern = UserDefaults.standard.string(forKey: Self.spiderPatternKey),
+           let pattern = SpiderPattern(rawValue: rawPattern) {
+            self.spiderPattern = pattern
+        } else {
+            self.spiderPattern = .p1234
         }
     }
 

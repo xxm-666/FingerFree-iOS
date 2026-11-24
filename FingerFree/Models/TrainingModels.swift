@@ -71,7 +71,7 @@ enum TrainingStageKind: String, CaseIterable, Identifiable, Codable {
         case .neuralWakeup:
             return "手掌虚握放桌面，固定食指与小指，交替单抬中指、无名指轻敲桌面。抬起高度 1–2 厘米即可，严禁另一根手指跟着翘起。"
         case .spiderWalk:
-            return "从 6 弦 5 品开始做 1-2-3-4 爬格子。换弦时只移动当前按弦的手指，其余手指死死贴在上一根弦的品格上，直到轮到它才允许抬起。"
+            return "从 6 弦 5 品开始做保留指爬格子。换弦时只移动当前按弦的手指，其余手指死死贴在上一根弦的品格上，直到轮到它才允许抬起。"
         case .middleRingIsolation:
             return "食指固定在 3 弦 5 品、小指固定在 3 弦 8 品（全程不松开）。只用中指（6品）和无名指（7品）在 2 弦与 4 弦之间交替按弦（4弦6品 → 2弦7品 → 2弦6品 → 4弦7品）。"
         case .chordTransition:
@@ -85,6 +85,19 @@ enum TrainingStageKind: String, CaseIterable, Identifiable, Codable {
         case .spiderWalk: return "一毫米原则：未轮到的手指死死贴住上一根弦"
         case .middleRingIsolation: return "食指 3弦5品 + 小指 3弦8品 全程锁定不松开"
         case .chordTransition: return "关注 Am→F 与 F→G 时中指、无名指独立分叉"
+        }
+    }
+
+    var transitionPrompt: String {
+        switch self {
+        case .neuralWakeup:
+            return "手掌自然虚握轻放桌面，准备开始神经唤醒。"
+        case .spiderWalk:
+            return "甩手放松几秒，拿起吉他，将左手指尖轻放到 6 弦 5–8 品准备。"
+        case .middleRingIsolation:
+            return "放松手腕与前臂，食指按稳 3 弦 5 品、小指按稳 3 弦 8 品准备。"
+        case .chordTransition:
+            return "轻甩左手舒缓肌肉，回到低把位准备 C - Am - F - G 慢速转换。"
         }
     }
 
@@ -103,6 +116,67 @@ enum TrainingStageKind: String, CaseIterable, Identifiable, Codable {
         case .spiderWalk: return Color(red: 0.96, green: 0.65, blue: 0.22)
         case .middleRingIsolation: return Color(red: 0.95, green: 0.36, blue: 0.45)
         case .chordTransition: return Color(red: 0.30, green: 0.80, blue: 0.56)
+        }
+    }
+}
+
+enum MetronomeSound: String, CaseIterable, Identifiable, Codable {
+    case warmWoodblock
+    case classicMechanical
+    case guitarBodyTap
+    case softMarimba
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .warmWoodblock: return "温润原木"
+        case .classicMechanical: return "经典机械"
+        case .guitarBodyTap: return "吉他敲板"
+        case .softMarimba: return "柔和马林巴"
+        }
+    }
+
+    var shortDescription: String {
+        switch self {
+        case .warmWoodblock: return "录音室木鱼空腔共鸣，久听不刺耳"
+        case .classicMechanical: return "传统机械摆清脆木盒声"
+        case .guitarBodyTap: return "箱体低频闷击 + 边敲，与真琴最搭"
+        case .softMarimba: return "温暖木琴短音，热身最放松"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .warmWoodblock: return "waveform.circle.fill"
+        case .classicMechanical: return "metronome.fill"
+        case .guitarBodyTap: return "guitars.fill"
+        case .softMarimba: return "music.note"
+        }
+    }
+}
+
+enum SpiderPattern: String, CaseIterable, Identifiable, Codable {
+    case p1234 = "1-2-3-4"
+    case p1324 = "1-3-2-4"
+    case p1423 = "1-4-2-3"
+
+    var id: String { rawValue }
+
+    /// 0-indexed finger order (0=食指, 1=中指, 2=无名指, 3=小指)
+    var fingerOrder: [Int] {
+        switch self {
+        case .p1234: return [0, 1, 2, 3]
+        case .p1324: return [0, 2, 1, 3]
+        case .p1423: return [0, 3, 1, 2]
+        }
+    }
+
+    var badgeText: String {
+        switch self {
+        case .p1234: return "基础顺序"
+        case .p1324: return "中/无名交错"
+        case .p1423: return "跨指剥离"
         }
     }
 }

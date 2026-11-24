@@ -6,6 +6,7 @@ struct StageVisualizerView: View {
     let totalBeatCount: Int
     let isRunning: Bool
     let fChordStyle: FChordStyle
+    let spiderPattern: SpiderPattern
 
     var body: some View {
         Group {
@@ -18,7 +19,8 @@ struct StageVisualizerView: View {
             case .spiderWalk:
                 SpiderFretboardVisualizer(
                     totalBeatCount: totalBeatCount,
-                    isRunning: isRunning
+                    isRunning: isRunning,
+                    pattern: spiderPattern
                 )
             case .middleRingIsolation:
                 IsolationFretboardVisualizer(
@@ -148,10 +150,11 @@ private struct HandTapVisualizer: View {
     }
 }
 
-// MARK: - Stage 2: 低把位保留指爬格子 (6弦5品 1-2-3-4)
+// MARK: - Stage 2: 低把位保留指爬格子 (6弦5品, 支持 1-2-3-4 / 1-3-2-4 / 1-4-2-3)
 private struct SpiderFretboardVisualizer: View {
     let totalBeatCount: Int
     let isRunning: Bool
+    let pattern: SpiderPattern
 
     // 6 strings ascending (6->1) then descending (2->5): 10 string phases * 4 fingers = 40 steps
     private static let stringSequence = [6, 5, 4, 3, 2, 1, 2, 3, 4, 5]
@@ -168,9 +171,18 @@ private struct SpiderFretboardVisualizer: View {
         return (totalBeatCount - 1) % (Self.stringSequence.count * 4)
     }
 
+    private var directionLabel: String {
+        let phase = currentStepIndex / 4
+        return phase < 5 ? "↑ 向1弦" : "↓ 向6弦"
+    }
+
     private var placements: [FingerPlacement] {
         let phase = currentStepIndex / 4
-        let activeFingerIdx = currentStepIndex % 4 // 0..3 -> finger 1..4
+        let stepInPhase = currentStepIndex % 4 // 0..3
+        let order = pattern.fingerOrder
+        let movedFingers = Set(order.prefix(stepInPhase + 1))
+        let activeFingerIdx = order[stepInPhase]
+
         let currentString = Self.stringSequence[phase]
         let previousPhase = (phase == 0) ? 0 : (phase - 1)
         let previousString = Self.stringSequence[previousPhase]
@@ -178,8 +190,8 @@ private struct SpiderFretboardVisualizer: View {
         return (0..<4).map { idx in
             let finger = idx + 1
             let fret = 5 + idx
-            // Fingers up to activeFingerIdx have moved to currentString; remaining fingers stay anchored on previousString!
-            let stringNum = (idx <= activeFingerIdx) ? currentString : previousString
+            let hasMoved = isRunning && totalBeatCount > 0 ? movedFingers.contains(idx) : true
+            let stringNum = hasMoved ? currentString : previousString
             return FingerPlacement(
                 finger: finger,
                 fret: fret,
@@ -193,7 +205,7 @@ private struct SpiderFretboardVisualizer: View {
         guard isRunning, totalBeatCount > 0 else { return "准备：6弦 5品 (食指)" }
         if let active = placements.first(where: { $0.isActive }) {
             let names = ["", "食指", "中指", "无名指", "小指"]
-            return "移动 \(names[active.finger]) → \(active.string)弦 \(active.fret)品"
+            return "移动 \(names[active.finger]) → \(active.string)弦\(active.fret)品"
         }
         return "保留指爬格子"
     }
@@ -201,8 +213,8 @@ private struct SpiderFretboardVisualizer: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack {
-                Label("保留指爬格子 (5–8品)", systemImage: "guitars.fill")
-                    .font(.subheadline.weight(.semibold))
+                Label("保留指 (\(pattern.rawValue)) · \(directionLabel)", systemImage: "guitars.fill")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(statusText)
