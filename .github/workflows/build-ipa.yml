@@ -43,18 +43,22 @@ jobs:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             build
 
-      - name: Package unsigned IPA
+      - name: Package & verify unsigned IPA
         run: |
           APP_PATH="build/Build/Products/Release-iphoneos/FingerFree.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "Error: FingerFree.app not found at $APP_PATH"
             exit 1
           fi
+          rm -rf output FingerFree-unsigned.ipa
           mkdir -p output/Payload
           cp -R "$APP_PATH" output/Payload/
+          # Remove code signature residue if any so sideloading tools sign cleanly
+          rm -rf output/Payload/FingerFree.app/_CodeSignature
           cd output
-          zip -qry ../FingerFree-unsigned.ipa Payload
+          zip -qr ../FingerFree-unsigned.ipa Payload
           cd ..
+          unzip -t FingerFree-unsigned.ipa
           ls -lh FingerFree-unsigned.ipa
 
       - name: Upload IPA artifact
@@ -62,11 +66,16 @@ jobs:
         with:
           name: FingerFree-unsigned-ipa
           path: FingerFree-unsigned.ipa
+          compression-level: 0
           retention-days: 90
 
-      - name: Create GitHub Release on version tag
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish direct IPA download to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'FingerFree Latest Unsigned IPA' }}
+          body: |
+            指律 (FingerFree) 自动构建的无签名 iOS IPA。
+            **iPhone 用户请直接点击下方 `FingerFree-unsigned.ipa` 下载（无需解压），再用 AltStore / SideStore / Sideloadly / 巨魔签名安装。**
           files: FingerFree-unsigned.ipa
-          generate_release_notes: true
+          make_latest: true
