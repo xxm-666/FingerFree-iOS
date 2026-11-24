@@ -76,18 +76,28 @@ struct PracticeSessionView: View {
                             spiderPattern: store.spiderPattern
                         )
 
-                        if currentStage == .spiderWalk {
-                            spiderPatternPicker
-                        } else if currentStage == .chordTransition {
-                            fChordStylePicker
+                        quickTipCard
+
+                        if metronome.isRunning {
+                            tensionDropButton
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        } else {
+                            Group {
+                                if currentStage == .spiderWalk {
+                                    spiderPatternPicker
+                                } else if currentStage == .chordTransition {
+                                    fChordStylePicker
+                                }
+                                metronomeControlPanel
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
 
-                        quickTipCard
-                        metronomeControlPanel
                         transportBar
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
+                    .animation(.spring(response: 0.34, dampingFraction: 0.86), value: metronome.isRunning)
                 }
 
                 if let nextIdx = pendingNextIndex {
@@ -110,11 +120,13 @@ struct PracticeSessionView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showRequirementDetail = true
-                    } label: {
-                        Image(systemName: "info.circle")
+                if !metronome.isRunning {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showRequirementDetail = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                        }
                     }
                 }
             }
@@ -181,9 +193,18 @@ struct PracticeSessionView: View {
                 Text(currentStage.exerciseName)
                     .font(.headline)
                 Spacer()
-                Text(currentStage.recommendedBPMText)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                if metronome.isRunning {
+                    Text("\(metronome.bpm) BPM")
+                        .font(.caption.bold().monospacedDigit())
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(currentStage.accentColor.opacity(0.16), in: Capsule())
+                        .foregroundStyle(currentStage.accentColor)
+                } else {
+                    Text(currentStage.recommendedBPMText)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -371,44 +392,7 @@ struct PracticeSessionView: View {
                 }
             }
 
-            // Prominent "-10 BPM" emergency tension drop button
-            Button {
-                metronome.dropTenBPM()
-                store.setBPM(metronome.bpm, for: currentStage)
-                withAnimation {
-                    tensionDropToast = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    withAnimation {
-                        tensionDropToast = false
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.title3)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("手指紧绷或联动？立刻 -10 BPM")
-                            .font(.subheadline.bold())
-                        Text(tensionDropToast ? "已下调至 \(metronome.bpm) BPM，放松手背继续！" : "保护神经控制通路，宁慢勿僵")
-                            .font(.caption2)
-                            .opacity(0.9)
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .foregroundStyle(.white)
-                .background(
-                    LinearGradient(
-                        colors: [Color(red: 0.92, green: 0.30, blue: 0.38), Color(red: 0.85, green: 0.45, blue: 0.25)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                )
-            }
-            .buttonStyle(.plain)
+            tensionDropButton
 
             HStack(spacing: 8) {
                 Toggle(isOn: Binding(
@@ -456,6 +440,46 @@ struct PracticeSessionView: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private var tensionDropButton: some View {
+        Button {
+            metronome.dropTenBPM()
+            store.setBPM(metronome.bpm, for: currentStage)
+            withAnimation {
+                tensionDropToast = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation {
+                    tensionDropToast = false
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("手指紧绷或联动？立刻 -10 BPM")
+                        .font(.subheadline.bold())
+                    Text(tensionDropToast ? "已下调至 \(metronome.bpm) BPM，放松手背继续！" : "保护神经控制通路，宁慢勿僵")
+                        .font(.caption2)
+                        .opacity(0.9)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .foregroundStyle(.white)
+            .background(
+                LinearGradient(
+                    colors: [Color(red: 0.92, green: 0.30, blue: 0.38), Color(red: 0.85, green: 0.45, blue: 0.25)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func bpmStepButton(delta: Int, label: String) -> some View {
