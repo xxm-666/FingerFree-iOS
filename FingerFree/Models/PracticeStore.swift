@@ -165,7 +165,43 @@ final class PracticeStore: ObservableObject {
         levelMasteries[level.rawValue] ?? .empty
     }
 
-    func recordTestResult(for level: TrainingLevel, score: Int, tier: TestSpeedTier) {
+    static let unlockScoreThreshold = 65 // B 级解锁门槛
+
+    /// Returns whether the user has unlocked `level` (Lv.1 always unlocked; Lv.2–5 unlock sequentially at B rank >= 65% or via jump-test; Chords unlocks at Lv.2 B rank or via jump-test).
+    func isUnlocked(_ level: TrainingLevel) -> Bool {
+        let threshold = Self.unlockScoreThreshold
+        if level == .lv1 { return true }
+        if mastery(for: level).bestScore >= threshold { return true }
+
+        let mainTrack = TrainingLevel.mainTrackLevels
+        if let idx = mainTrack.firstIndex(of: level) {
+            // Passing any higher main-track stage via jump-test automatically unlocks earlier main-track stages
+            if mainTrack.dropFirst(idx + 1).contains(where: { mastery(for: $0).bestScore >= threshold }) {
+                return true
+            }
+            // Standard sequential unlock: previous main-track stage >= B rank
+            let prev = mainTrack[idx - 1]
+            return mastery(for: prev).bestScore >= threshold
+        } else {
+            // Chord Lab unlocks once Lv.2 (or any higher main-track stage) reaches B rank
+            return [TrainingLevel.lv2, .lv3, .lv4, .lv5].contains { mastery(for: $0).bestScore >= threshold }
+        }
+    }
+
+    func lockReason(for level: TrainingLevel) -> String? {
+        guard !isUnlocked(level) else { return nil }
+        let mainTrack = TrainingLevel.mainTrackLevels
+        if let idx = mainTrack.firstIndex(of: level), idx > 0 {
+            let prev = mainTrack[idx - 1]
+            return "需先完成前置阶段 \(prev.code) \(prev.title) 考核达 B 级（65%），或直接参加本阶段跳级考核"
+        }
+        return "需先完成主线 Lv.2 基础定型考核达 B 级（65%），或直接参加和弦跳级考核"
+    }
+
+    @discardableResult
+    func recordTestResult(for level: TrainingLevel, score: Int, tier: TestSpeedTier) -> [TrainingLevel] {
+        let unlockedBefore = Set(TrainingLevel.displayOrder.filter { isUnlocked($0) })
+
         let rank = ProficiencyRank.from(score: score)
         var current = mastery(for: level)
         current.lastScore = score
@@ -185,41 +221,25 @@ final class PracticeStore: ObservableObject {
             qualifiesForSpeedUp: score >= 90
         )
         addRecord(record)
+
+        return TrainingLevel.displayOrder.filter { !unlockedBefore.contains($0) && isUnlocked($0) }
     }
 
     func addRecord(_ record: PracticeRecord) {
         records.insert(record, at: 0)
     }
 
-    /// Soft-gate prerequisite reminder (never blocks, only advises when earlier foundations are below B rank).
-    func prerequisiteWarning(for level: TrainingLevel) -> String? {
-        switch level {
-        case .lv1:
-            return nil
-        case .lv2, .lv3, .lv4, .lv5:
-            guard let prev = TrainingLevel(rawValue: level.rawValue - 1) else { return nil }
-            let prevMastery = mastery(for: prev)
-            if prevMastery.bestScore < 65 {
-                return "建议提示：前置阶段 \(prev.code) \(prev.title) 尚未达到 B 级（65%），先打牢基础效果更佳（当前仍可直接练习）。"
-            }
-            return nil
-        case .lv6:
-            let unfinished = [TrainingLevel.lv2, .lv3, .lv4].filter { mastery(for: $0).bestScore < 65 }
-            if !unfinished.isEmpty {
-                let codes = unfinished.map(\.code).joined(separator: "、")
-                return "终极挑战提示：建议先让 \(codes) 达到 B 级以上再挑战全指板（当前仍可直接体验）。"
-            }
-            return nil
-        }
-    }
-
-    /// Recommends today's focus level & concrete next action (practice vs. stage test).
+    /// Recommends today's focus level & concrete next action strictly among unlocked stages.
     var dailyRecommendation: DailyRecommendation {
-        // Active focus level = first level not yet at A rank (80%), or Lv.6 if all mastered
-        let focusLevel = TrainingLevel.allCases.first { mastery(for: $0).bestScore < 80 } ?? .lv6
+        let unlockedLevels = TrainingLevel.displayOrder.filter { isUnlocked($0) }
+        // Prioritize first unlocked stage not yet at B rank (to unlock next), else first below A rank, else latest unlocked
+        let focusLevel = unlockedLevels.first { mastery(for: $0).bestScore < Self.unlockScoreThreshold }
+            ?? unlockedLevels.first { mastery(for: $0).bestScore < 80 }
+            ?? unlockedLevels.last
+            ?? .lv1
+
         let m = mastery(for: focusLevel)
         let exercises = focusLevel.exercises
-        // Pick the exercise with the lowest relative progress (current BPM - default BPM)
         let targetExercise = exercises.min { a, b in
             (bpm(for: a) - a.defaultBPM) < (bpm(for: b) - b.defaultBPM)
         } ?? exercises[0]
@@ -229,14 +249,13 @@ final class PracticeStore: ObservableObject {
         }
 
         if practicedFocusRecently && m.lastScore < 80 {
+            let unlockHint = m.bestScore < Self.unlockScoreThreshold ? "达 B 级 (65%) 解锁下一阶段" : "冲刺 A/S 级"
             return DailyRecommendation(
                 level: focusLevel,
                 exercise: targetExercise,
                 shouldTakeTest: true,
                 headline: "检验 \(focusLevel.code) \(focusLevel.title) 熟练度",
-                subtitle: m.bestScore > 0
-                    ? "近期已练习本阶段，上次考核 \(m.lastScore)%（\(m.lastRank.rawValue) 级），复测冲刺 A/S 级"
-                    : "近期已练习本阶段，测一次看看当前熟练度能否达标"
+                subtitle: "近期已练本阶段，去考核\(unlockHint)"
             )
         } else {
             let currentBPM = bpm(for: targetExercise)
@@ -253,12 +272,12 @@ final class PracticeStore: ObservableObject {
     }
 
     var testedLevelCount: Int {
-        TrainingLevel.allCases.filter { mastery(for: $0).lastTestedDate != nil || mastery(for: $0).bestScore > 0 }.count
+        TrainingLevel.displayOrder.filter { mastery(for: $0).lastTestedDate != nil || mastery(for: $0).bestScore > 0 }.count
     }
 
     /// Average score across tested levels only (0 if no level has been tested yet).
     var overallMasteryPercent: Int {
-        let tested = TrainingLevel.allCases.filter { mastery(for: $0).lastTestedDate != nil || mastery(for: $0).bestScore > 0 }
+        let tested = TrainingLevel.displayOrder.filter { mastery(for: $0).lastTestedDate != nil || mastery(for: $0).bestScore > 0 }
         guard !tested.isEmpty else { return 0 }
         let sum = tested.reduce(0) { $0 + mastery(for: $1).bestScore }
         return sum / tested.count

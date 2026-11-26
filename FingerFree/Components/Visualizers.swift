@@ -36,8 +36,14 @@ struct ExerciseVisualizerView: View {
                 ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .basic, accentColor: accentColor)
             case .chordsExtended:
                 ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .extended, accentColor: accentColor)
+            case .chordsWideVoicing:
+                ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .wideVoicing, accentColor: accentColor)
             case .chordsBarreShift:
                 ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .barreShift, accentColor: accentColor)
+            case .chordsAShapeBarre:
+                ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .aShapeBarre, accentColor: accentColor)
+            case .chordsJazz251:
+                ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .jazz251, accentColor: accentColor)
             case .fretboardCruise(let order):
                 FretboardCruiseVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, order: order, accentColor: accentColor)
             case .fretboardDiagonal:
@@ -614,9 +620,9 @@ private struct FullFretboardOverviewBar: View {
     }
 }
 
-// MARK: - Lv.5: 和弦转换 (基础 / 进阶 / 大横按平移)
+// MARK: - 和弦实战支线: 6 套渐进和弦转换可视化
 private struct ChordTransitionVisualizer: View {
-    enum Mode { case basic, extended, barreShift }
+    enum Mode { case basic, extended, wideVoicing, barreShift, aShapeBarre, jazz251 }
 
     let currentBeat: Int
     let totalBeatCount: Int
@@ -646,12 +652,33 @@ private struct ChordTransitionVisualizer: View {
                 ChordSpec(name: "Cadd9", subtitle: "加九和弦", baseFretLabel: nil, dots: [(4, 2, 1), (5, 3, 2), (2, 3, 3), (1, 3, 4)], mutedStrings: [6], openStrings: [3], barreFret: nil, barreStringRange: nil, focusNote: "无名指与小指锁死1-2弦3品作保留指"),
                 ChordSpec(name: "G", subtitle: "大三和弦", baseFretLabel: nil, dots: [(5, 2, 1), (6, 3, 2), (2, 3, 3), (1, 3, 4)], mutedStrings: [], openStrings: [3, 4], barreFret: nil, barreStringRange: nil, focusNote: "3-4指不动，仅食指与中指同步上移一根弦")
             ]
+        case .wideVoicing:
+            return [
+                ChordSpec(name: "Gadd9", subtitle: "宽指距加九", baseFretLabel: nil, dots: [(5, 2, 1), (3, 2, 2), (6, 3, 3), (1, 3, 4)], mutedStrings: [], openStrings: [2, 4], barreFret: nil, barreStringRange: nil, focusNote: "四指同时分叉按弦，2弦与4弦空弦必须保持通透"),
+                ChordSpec(name: "Em9", subtitle: "小九扩张", baseFretLabel: nil, dots: [(5, 2, 1), (2, 3, 2), (4, 4, 4)], mutedStrings: [], openStrings: [1, 3, 6], barreFret: nil, barreStringRange: nil, focusNote: "小指跨至4弦4品，指尖立起绝不碰闷3弦空弦"),
+                ChordSpec(name: "Cmaj9", subtitle: "大九色彩", baseFretLabel: nil, dots: [(4, 2, 1), (5, 3, 2), (2, 3, 3), (3, 4, 4)], mutedStrings: [6], openStrings: [1], barreFret: nil, barreStringRange: nil, focusNote: "四指各自落位，小指3弦4品与无名指2弦3品独立分开"),
+                ChordSpec(name: "Dadd9/F#", subtitle: "转位加九", baseFretLabel: nil, dots: [(6, 2, 1), (3, 2, 2), (2, 3, 3)], mutedStrings: [], openStrings: [1, 4, 5], barreFret: nil, barreStringRange: nil, focusNote: "食指跨按6弦2品低音，保持1弦空弦清亮共鸣")
+            ]
         case .barreShift:
             return [
                 ChordSpec(name: "F", subtitle: "1品大横按", baseFretLabel: "1品", dots: [(3, 2, 2), (5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "1品稳固压实，准备第4拍尾微松滑向3品"),
                 ChordSpec(name: "G", subtitle: "3品大横按", baseFretLabel: "3品", dots: [(3, 2, 2), (5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "保持E型手型整体平移2品，绝不散架"),
                 ChordSpec(name: "Am", subtitle: "5品小调横按", baseFretLabel: "5品", dots: [(5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "抬起中指转为Em型大横按，手腕保持松弛"),
                 ChordSpec(name: "Em", subtitle: "7品A型横按", baseFretLabel: "7品", dots: [(2, 2, 2), (4, 3, 3), (3, 3, 4)], mutedStrings: [6], openStrings: [], barreFret: 1, barreStringRange: 1...5, focusNote: "食指7品横按1–5弦，中无名小指紧凑落位")
+            ]
+        case .aShapeBarre:
+            return [
+                ChordSpec(name: "C#m7", subtitle: "4品A型小七", baseFretLabel: "4品", dots: [(2, 2, 2), (4, 3, 3)], mutedStrings: [6], openStrings: [], barreFret: 1, barreStringRange: 1...5, focusNote: "食指4品横按1–5弦，中指与无名指精准分叉"),
+                ChordSpec(name: "B", subtitle: "2品A型大横按", baseFretLabel: "2品", dots: [(4, 3, 2), (3, 3, 3), (2, 3, 4)], mutedStrings: [6], openStrings: [], barreFret: 1, barreStringRange: 1...5, focusNote: "2-3-4指紧凑落于4品，保持1弦2品清晰发声"),
+                ChordSpec(name: "Aadd9", subtitle: "小指跨度加九", baseFretLabel: nil, dots: [(4, 2, 1), (2, 2, 2), (3, 4, 4)], mutedStrings: [6], openStrings: [1, 5], barreFret: nil, barreStringRange: nil, focusNote: "小指独立伸展至3弦4品，绝不拖倒1弦空弦"),
+                ChordSpec(name: "E", subtitle: "开放大三", baseFretLabel: nil, dots: [(3, 1, 1), (5, 2, 2), (4, 2, 3)], mutedStrings: [], openStrings: [1, 2, 6], barreFret: nil, barreStringRange: nil, focusNote: "迅速卸力归位，体会6根弦全开的松弛共鸣")
+            ]
+        case .jazz251:
+            return [
+                ChordSpec(name: "Dm9", subtitle: "爵士小九 (II)", baseFretLabel: "3品", dots: [(4, 1, 1), (5, 3, 2), (3, 3, 3), (2, 3, 4)], mutedStrings: [1, 6], openStrings: [], barreFret: nil, barreStringRange: nil, focusNote: "食指4弦3品，2-3-4指分别独立按5/3/2弦5品"),
+                ChordSpec(name: "G13", subtitle: "属十三 (V)", baseFretLabel: "3品", dots: [(6, 1, 1), (4, 1, 2), (3, 2, 3), (2, 3, 4)], mutedStrings: [1, 5], openStrings: [], barreFret: nil, barreStringRange: nil, focusNote: "食指6弦3品、中指4弦3品、无名指3弦4品、小指2弦5品"),
+                ChordSpec(name: "Cmaj9", subtitle: "爵士大九 (I)", baseFretLabel: nil, dots: [(4, 2, 1), (5, 3, 2), (2, 3, 3), (3, 4, 4)], mutedStrings: [1, 6], openStrings: [], barreFret: nil, barreStringRange: nil, focusNote: "四指无空弦依赖，内侧四根弦同步精准落位"),
+                ChordSpec(name: "A7#5", subtitle: "属七增五 (VI)", baseFretLabel: "5品", dots: [(6, 1, 1), (4, 1, 2), (3, 2, 3), (2, 2, 4)], mutedStrings: [1, 5], openStrings: [], barreFret: nil, barreStringRange: nil, focusNote: "整体滑移至5品，四指紧凑成型准备回到 Dm9")
             ]
         case .basic:
             let fChord: ChordSpec = (fChordStyle == .barre)

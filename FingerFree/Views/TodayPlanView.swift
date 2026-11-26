@@ -2,21 +2,42 @@ import SwiftUI
 
 struct TodayPlanView: View {
     @EnvironmentObject private var store: PracticeStore
-    @State private var selectedLevel: TrainingLevel = .lv1
+
+    private enum TrainingTrack: String, CaseIterable, Identifiable {
+        case main = "指法主线 (Lv.1–5)"
+        case chords = "和弦实战 (6项)"
+        var id: String { rawValue }
+    }
+
+    @State private var selectedTrack: TrainingTrack = .main
+    @State private var selectedMainLevel: TrainingLevel = .lv1
     @State private var activeSession: PracticeSessionConfig?
     @State private var activeTestLevel: TrainingLevel?
+    @State private var lockedPromptLevel: TrainingLevel?
     @State private var showPrinciplesSheet: Bool = false
+
+    private var currentLevel: TrainingLevel {
+        selectedTrack == .main ? selectedMainLevel : .chords
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     dailyRecommendationCard
-                    levelStepperRow
-                    selectedLevelBanner
-                    if let warning = store.prerequisiteWarning(for: selectedLevel) {
-                        prerequisiteWarningBanner(text: warning)
+
+                    Picker("训练模式", selection: $selectedTrack) {
+                        ForEach(TrainingTrack.allCases) { track in
+                            Text(track.rawValue).tag(track)
+                        }
                     }
+                    .pickerStyle(.segmented)
+
+                    if selectedTrack == .main {
+                        levelStepperRow
+                    }
+
+                    selectedLevelBanner
                     exercisesListSection
                     stageTestCTACard
                 }
@@ -44,6 +65,24 @@ struct TodayPlanView: View {
                 LevelTestView(level: level)
                     .environmentObject(store)
             }
+            .alert(
+                "该阶段尚未解锁",
+                isPresented: Binding(
+                    get: { lockedPromptLevel != nil },
+                    set: { if !$0 { lockedPromptLevel = nil } }
+                ),
+                presenting: lockedPromptLevel
+            ) { lv in
+                Button("直接跳级考核") {
+                    lockedPromptLevel = nil
+                    activeTestLevel = lv
+                }
+                Button("知道了", role: .cancel) {
+                    lockedPromptLevel = nil
+                }
+            } message: { lv in
+                Text(store.lockReason(for: lv) ?? "完成前置阶段考核达 B 级（65%）后解锁，或直接参加跳级考核。")
+            }
             .sheet(isPresented: $showPrinciplesSheet) {
                 principlesSheet
                     .presentationDetents([.medium, .large])
@@ -56,7 +95,12 @@ struct TodayPlanView: View {
     private var dailyRecommendationCard: some View {
         let rec = store.dailyRecommendation
         return Button {
-            selectedLevel = rec.level
+            if rec.level.isMainTrack {
+                selectedTrack = .main
+                selectedMainLevel = rec.level
+            } else {
+                selectedTrack = .chords
+            }
             if rec.shouldTakeTest {
                 activeTestLevel = rec.level
             } else {
@@ -113,35 +157,19 @@ struct TodayPlanView: View {
         .buttonStyle(.plain)
     }
 
-    private func prerequisiteWarningBanner(text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "info.circle.fill")
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .padding(.top, 1)
-            Text(text)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineSpacing(2)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    // MARK: - Horizontal 6-Level Stepper (Easy -> Hard)
+    // MARK: - Horizontal 5-Level Main Track Stepper (Lv.1 -> Lv.5 征服指板)
 
     private var levelStepperRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(TrainingLevel.allCases) { level in
-                    let isSelected = (level == selectedLevel)
+                ForEach(TrainingLevel.mainTrackLevels) { level in
+                    let isSelected = (level == selectedMainLevel)
+                    let unlocked = store.isUnlocked(level)
                     let m = store.mastery(for: level)
 
                     Button {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                            selectedLevel = level
+                            selectedMainLevel = level
                         }
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
@@ -149,8 +177,13 @@ struct TodayPlanView: View {
                                 Text(level.code)
                                     .font(.caption2.bold())
                                 Spacer()
-                                Text("\(m.bestScore)%")
-                                    .font(.caption2.bold().monospacedDigit())
+                                if !unlocked {
+                                    Image(systemName: "lock.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                } else {
+                                    Text("\(m.bestScore)%")
+                                        .font(.caption2.bold().monospacedDigit())
+                                }
                             }
                             .opacity(isSelected ? 0.95 : 0.72)
 
@@ -163,7 +196,7 @@ struct TodayPlanView: View {
                                     Capsule()
                                         .fill(isSelected ? Color.white.opacity(0.28) : Color.primary.opacity(0.1))
                                     Capsule()
-                                        .fill(isSelected ? Color.white : level.accentColor)
+                                        .fill(isSelected ? Color.white : (unlocked ? level.accentColor : Color.secondary))
                                         .frame(width: max(4, geo.size.width * CGFloat(m.bestScore) / 100.0))
                                 }
                             }
@@ -176,6 +209,7 @@ struct TodayPlanView: View {
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                         )
                         .foregroundStyle(isSelected ? .white : .primary)
+                        .opacity(unlocked || isSelected ? 1.0 : 0.68)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .strokeBorder(isSelected ? level.accentColor : Color.primary.opacity(0.06), lineWidth: 1)
@@ -190,18 +224,22 @@ struct TodayPlanView: View {
     // MARK: - Selected Level Banner
 
     private var selectedLevelBanner: some View {
-        let m = store.mastery(for: selectedLevel)
-        let totalMins = selectedLevel.exercises.reduce(0) { $0 + $1.durationMinutes }
+        let level = currentLevel
+        let unlocked = store.isUnlocked(level)
+        let m = store.mastery(for: level)
+        let totalMins = level.exercises.reduce(0) { $0 + $1.durationMinutes }
         let masteryLabel: String = {
+            if !unlocked { return "🔒 未解锁" }
             if m.bestScore == 0 { return "尚未考核" }
             if m.lastScore != m.bestScore {
                 return "最高 \(m.bestScore)% · 最近 \(m.lastScore)%"
             }
             return "熟练度 \(m.bestScore)% (\(m.bestRank.rawValue))"
         }()
+
         return VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Label("\(selectedLevel.code) · \(selectedLevel.difficultyLabel)", systemImage: selectedLevel.symbolName)
+                Label("\(level.code) · \(level.difficultyLabel)", systemImage: level.symbolName)
                     .font(.caption.bold())
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -213,67 +251,106 @@ struct TodayPlanView: View {
                     .font(.caption.bold().monospacedDigit())
             }
 
-            Text("\(selectedLevel.title)阶段")
+            Text(level.isMainTrack ? "\(level.title)阶段" : "和弦实战专项区")
                 .font(.title3.bold())
 
-            Text(selectedLevel.summary)
+            Text(level.summary)
                 .font(.caption)
                 .opacity(0.92)
                 .lineSpacing(3)
 
-            Button {
-                activeSession = .fullLevel(selectedLevel)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                        .font(.caption)
-                    Text("一键连练本阶段全部练习")
-                        .font(.subheadline.bold())
-                    Spacer()
-                    Text("\(selectedLevel.exercises.count) 项 · \(totalMins) 分钟")
-                        .font(.caption2.bold().monospacedDigit())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.black.opacity(0.22), in: Capsule())
+            if unlocked {
+                Button {
+                    activeSession = .fullLevel(level)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.caption)
+                        Text(level.isMainTrack ? "一键连练本阶段全部练习" : "一键连练全部 6 套和弦实战")
+                            .font(.subheadline.bold())
+                        Spacer()
+                        Text("\(level.exercises.count) 项 · \(totalMins) 分钟")
+                            .font(.caption2.bold().monospacedDigit())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.black.opacity(0.22), in: Capsule())
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let reason = store.lockReason(for: level) {
+                        Label(reason, systemImage: "lock.fill")
+                            .font(.caption2.weight(.medium))
+                            .opacity(0.92)
+                    }
+
+                    Button {
+                        activeTestLevel = level
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "lock.open.fill")
+                                .font(.caption)
+                            Text("我有基础 · 直接跳级考核（达 B 级即解锁）")
+                                .font(.subheadline.bold())
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 2)
             }
-            .buttonStyle(.plain)
-            .padding(.top, 2)
         }
         .foregroundStyle(.white)
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
-                colors: [selectedLevel.accentColor, Color(red: 0.13, green: 0.16, blue: 0.28)],
+                colors: [
+                    unlocked ? level.accentColor : Color(.systemGray),
+                    Color(red: 0.13, green: 0.16, blue: 0.28)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
-        .shadow(color: selectedLevel.accentColor.opacity(0.22), radius: 10, y: 5)
+        .shadow(color: (unlocked ? level.accentColor : .black).opacity(0.20), radius: 10, y: 5)
     }
 
     // MARK: - Detailed Sub-Exercises for Selected Level
 
     private var exercisesListSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let level = currentLevel
+        let unlocked = store.isUnlocked(level)
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("本阶段详细练习 (\(selectedLevel.exercises.count) 项)")
+                Text(level.isMainTrack ? "本阶段详细练习 (\(level.exercises.count) 项)" : "渐进和弦实战课程 (\(level.exercises.count) 项 · 由易到难)")
                     .font(.subheadline.bold())
                 Spacer()
-                Text("点击进入专注训练")
+                Text(unlocked ? "点击进入专注训练" : "预览模式 · 解锁后开练")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(Array(selectedLevel.exercises.enumerated()), id: \.element.id) { idx, exercise in
+            ForEach(Array(level.exercises.enumerated()), id: \.element.id) { idx, exercise in
                 Button {
-                    activeSession = .single(exercise)
+                    if unlocked {
+                        activeSession = .single(exercise)
+                    } else {
+                        lockedPromptLevel = level
+                    }
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .top) {
@@ -283,20 +360,20 @@ struct TodayPlanView: View {
                                         .font(.caption2.bold())
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
-                                        .background(selectedLevel.accentColor.opacity(0.16), in: Capsule())
-                                        .foregroundStyle(selectedLevel.accentColor)
+                                        .background((unlocked ? level.accentColor : Color.secondary).opacity(0.16), in: Capsule())
+                                        .foregroundStyle(unlocked ? level.accentColor : .secondary)
                                     Text("\(exercise.durationMinutes) 分钟 · \(store.bpm(for: exercise)) BPM")
                                         .font(.caption2.monospacedDigit())
                                         .foregroundStyle(.secondary)
                                 }
                                 Text("\(idx + 1). \(exercise.name)")
                                     .font(.subheadline.bold())
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(unlocked ? .primary : .secondary)
                             }
                             Spacer()
-                            Image(systemName: "play.circle.fill")
+                            Image(systemName: unlocked ? "play.circle.fill" : "lock.circle.fill")
                                 .font(.title2)
-                                .foregroundStyle(selectedLevel.accentColor)
+                                .foregroundStyle(unlocked ? level.accentColor : .secondary.opacity(0.6))
                         }
 
                         Text(exercise.steps.first ?? exercise.tip)
@@ -307,6 +384,7 @@ struct TodayPlanView: View {
                     }
                     .padding(14)
                     .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .opacity(unlocked ? 1.0 : 0.78)
                 }
                 .buttonStyle(.plain)
             }
@@ -316,46 +394,52 @@ struct TodayPlanView: View {
     // MARK: - Stage Proficiency Test CTA
 
     private var stageTestCTACard: some View {
-        let spec = selectedLevel.testSpec
+        let level = currentLevel
+        let unlocked = store.isUnlocked(level)
+        let spec = level.testSpec
         return Button {
-            activeTestLevel = selectedLevel
+            activeTestLevel = level
         } label: {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(selectedLevel.accentColor.opacity(0.16))
+                        .fill(level.accentColor.opacity(0.16))
                         .frame(width: 46, height: 46)
-                    Image(systemName: spec.usesAudioAnalysis ? "mic.badge.plus" : "trophy.fill")
+                    Image(systemName: unlocked ? (spec.usesAudioAnalysis ? "mic.badge.plus" : "trophy.fill") : "lock.open.fill")
                         .font(.title3)
-                        .foregroundStyle(selectedLevel.accentColor)
+                        .foregroundStyle(level.accentColor)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(spec.usesAudioAnalysis ? "实时麦克风音频考核" : "阶段熟练度考核（免麦克风）")
+                    Text(unlocked
+                         ? (spec.usesAudioAnalysis ? "实时麦克风音频考核" : "阶段熟练度考核（免麦克风）")
+                         : "跳级考核通道（达 B 级 65% 即刻解锁）")
                         .font(.caption.bold())
-                        .foregroundStyle(selectedLevel.accentColor)
+                        .foregroundStyle(unlocked ? level.accentColor : .orange)
                     Text(spec.title)
                         .font(.subheadline.bold())
                         .foregroundStyle(.primary)
-                    Text("测出你在 \(selectedLevel.code) 的熟练度百分比与 S/A/B/C 评级")
+                    Text(unlocked
+                         ? "测出你在 \(level.code) 的熟练度百分比，达 B 级解锁下一阶段"
+                         : "有基础的琴友可直接参加本阶段考核解锁")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Text("去测试")
+                Text(unlocked ? "去测试" : "跳级考")
                     .font(.caption.bold())
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(selectedLevel.accentColor, in: Capsule())
+                    .background(unlocked ? level.accentColor : Color.orange, in: Capsule())
                     .foregroundStyle(.white)
             }
             .padding(14)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(selectedLevel.accentColor.opacity(0.45), lineWidth: 1.5)
+                    .strokeBorder((unlocked ? level.accentColor : Color.orange).opacity(0.45), lineWidth: 1.5)
             )
         }
         .buttonStyle(.plain)

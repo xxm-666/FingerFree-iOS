@@ -1,18 +1,32 @@
 import SwiftUI
 
-// MARK: - 6 Progressive Training Levels (Easy -> Master Boss)
+// MARK: - 5-Level Progressive Main Track (Lv.1–Lv.5) + Dedicated Chord Lab Branch
 
 enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
     case lv1 = 1
     case lv2 = 2
     case lv3 = 3
     case lv4 = 4
-    case lv5 = 5
-    case lv6 = 6
+    case lv5 = 6       // 征服指板 (preserves rawValue 6 for saved mastery compatibility)
+    case chords = 5    // 和弦实战支线 (preserves rawValue 5 for saved mastery compatibility)
+
+    static let mainTrackLevels: [TrainingLevel] = [.lv1, .lv2, .lv3, .lv4, .lv5]
+    static let displayOrder: [TrainingLevel] = [.lv1, .lv2, .lv3, .lv4, .lv5, .chords]
 
     var id: Int { rawValue }
 
-    var code: String { "Lv.\(rawValue)" }
+    var isMainTrack: Bool { self != .chords }
+
+    var code: String {
+        switch self {
+        case .lv1: return "Lv.1"
+        case .lv2: return "Lv.2"
+        case .lv3: return "Lv.3"
+        case .lv4: return "Lv.4"
+        case .lv5: return "Lv.5"
+        case .chords: return "和弦"
+        }
+    }
 
     var title: String {
         switch self {
@@ -20,8 +34,8 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv2: return "基础定型"
         case .lv3: return "专项剥离"
         case .lv4: return "扩张与爆发"
-        case .lv5: return "实战融合"
-        case .lv6: return "征服指板"
+        case .lv5: return "征服指板"
+        case .chords: return "和弦实战"
         }
     }
 
@@ -31,8 +45,8 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv2: return "基础 · 保留指"
         case .lv3: return "核心 · 破联动"
         case .lv4: return "高阶 · 跨度/圆滑音"
-        case .lv5: return "大师 · 和弦实战"
-        case .lv6: return "终极 · 1–12品全指板"
+        case .lv5: return "终极 · 1–12品全指板"
+        case .chords: return "专项 · 从开放到爵士"
         }
     }
 
@@ -42,8 +56,8 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv2: return "落实「一毫米原则」与「保留指」，覆盖顺序、逆序与交错指法，消除换弦乱飞。"
         case .lv3: return "双指锁定锚点，集中撕开中指/无名指以及无名指/小指的共享肌腱联动。"
         case .lv4: return "循序拉伸指间蹼膜解决大横按吃力，并用纯左手打勾弦练出指尖独立爆发力。"
-        case .lv5: return "将独立性与扩张力转化为实战开放和弦、进阶和弦与大横按平移零延迟切换。"
-        case .lv6: return "终极挑战：打通 1–4 品宽品距到 9–12 品窄品距，在全指板移动换把中保持绝对独立（建议 Lv.2–4 达标后挑战）。"
+        case .lv5: return "主线终极挑战：打通 1–4 品宽品距到 9–12 品窄品距，在全指板移动换把中保持绝对独立。"
+        case .chords: return "独立实战支线：从经典开放和弦、宽指距色彩和弦、E/A 型大横按平移一路进阶到爵士/R&B 独立声部。"
         }
     }
 
@@ -53,8 +67,8 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv2: return "guitars.fill"
         case .lv3: return "scope"
         case .lv4: return "bolt.fill"
-        case .lv5: return "music.quarternote.3"
-        case .lv6: return "crown.fill"
+        case .lv5: return "crown.fill"
+        case .chords: return "music.quarternote.3"
         }
     }
 
@@ -64,18 +78,18 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv2: return Color(red: 0.96, green: 0.62, blue: 0.16)
         case .lv3: return Color(red: 0.95, green: 0.30, blue: 0.42)
         case .lv4: return Color(red: 0.65, green: 0.35, blue: 0.96)
-        case .lv5: return Color(red: 0.14, green: 0.76, blue: 0.52)
-        case .lv6: return Color(red: 0.93, green: 0.46, blue: 0.18)
+        case .lv5: return Color(red: 0.93, green: 0.46, blue: 0.18)
+        case .chords: return Color(red: 0.14, green: 0.76, blue: 0.52)
         }
     }
 
-    /// Lv.1 Wakeup requires NO microphone audio test; Lv.2–Lv.6 use real-time microphone audio analysis.
+    /// Lv.1 Wakeup requires NO microphone audio test; Lv.2–Lv.5 & Chords use real-time microphone audio analysis.
     var usesAudioTest: Bool {
         self != .lv1
     }
 
     var isChordAudioTest: Bool {
-        self == .lv5
+        self == .chords
     }
 
     var exercises: [ExerciseItem] {
@@ -143,21 +157,7 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv5:
             return LevelTestSpec(
                 level: .lv5,
-                title: "Lv.5 实战和弦转换实时音频考核",
-                durationSeconds: 48,
-                usesAudioAnalysis: true,
-                testExerciseId: "lv5_camfg",
-                tiers: [
-                    TestSpeedTier(name: "达标", bpm: 60, speedWeight: 0.85),
-                    TestSpeedTier(name: "进阶", bpm: 75, speedWeight: 0.95),
-                    TestSpeedTier(name: "大师", bpm: 90, speedWeight: 1.00)
-                ],
-                requirement: "C - Am - F - G 每四拍切换一次，麦克风实时检测换和弦第 1 拍的扫弦起音准点率与和弦音色饱满度。"
-            )
-        case .lv6:
-            return LevelTestSpec(
-                level: .lv6,
-                title: "Lv.6 征服全指板实时音频通关赛",
+                title: "Lv.5 征服全指板实时音频通关赛",
                 durationSeconds: 60,
                 usesAudioAnalysis: true,
                 testExerciseId: "lv6_diagonal",
@@ -168,11 +168,25 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
                 ],
                 requirement: "从 6 弦 1 品一路斜穿换把直达 1 弦 12 品并折返，麦克风逐音验收宽把位与窄把位的音准、换把同步与清晰度。"
             )
+        case .chords:
+            return LevelTestSpec(
+                level: .chords,
+                title: "和弦实战转换实时音频考核",
+                durationSeconds: 48,
+                usesAudioAnalysis: true,
+                testExerciseId: "lv5_camfg",
+                tiers: [
+                    TestSpeedTier(name: "达标", bpm: 60, speedWeight: 0.85),
+                    TestSpeedTier(name: "进阶", bpm: 75, speedWeight: 0.95),
+                    TestSpeedTier(name: "大师", bpm: 90, speedWeight: 1.00)
+                ],
+                requirement: "C - Am - F - G 每四拍切换一次，麦克风通过 FFT 多频段实时检测第 1 拍换和弦准点率与和弦音色饱满度。"
+            )
         }
     }
 }
 
-// MARK: - Visualizer Kinds & Detailed Exercises (22 Curated Drills)
+// MARK: - Visualizer Kinds & Detailed Exercises (25 Curated Drills)
 
 enum ExerciseVisualizerKind: Hashable, Codable {
     case handTap
@@ -187,7 +201,10 @@ enum ExerciseVisualizerKind: Hashable, Codable {
     case trill
     case chordsBasic
     case chordsExtended
+    case chordsWideVoicing
     case chordsBarreShift
+    case chordsAShapeBarre
+    case chordsJazz251
     case fretboardCruise(order: [Int])
     case fretboardDiagonal
 }
@@ -262,7 +279,8 @@ struct ExerciseItem: Identifiable, Hashable {
             let midi = GuitarPitchHelper.midiNote(string: pos.string, fret: pos.activeFret)
             return (midi, "\(pos.string)弦\(pos.activeFret)品 \(GuitarPitchHelper.noteName(forMIDI: midi))")
 
-        case .handTap, .handStar, .handVulcan, .handRoll, .chordsBasic, .chordsExtended, .chordsBarreShift:
+        case .handTap, .handStar, .handVulcan, .handRoll,
+             .chordsBasic, .chordsExtended, .chordsWideVoicing, .chordsBarreShift, .chordsAShapeBarre, .chordsJazz251:
             return nil
         }
     }
@@ -548,70 +566,17 @@ struct ExerciseItem: Identifiable, Hashable {
             visualizerKind: .trill
         ),
 
-        // ==================== Lv.5 实战融合 (3项) ====================
-        ExerciseItem(
-            id: "lv5_camfg",
-            level: .lv5,
-            name: "C - Am - F - G 慢速转换",
-            badge: "经典实战",
-            durationMinutes: 2,
-            defaultBPM: 60,
-            recommendedBPMText: "60 BPM · 四拍换一次",
-            tip: "重点关注 Am→F 与 F→G 时中指与无名指在 3、4、5 弦同步分叉",
-            transitionPrompt: "轻甩左手回到低把位，准备 C - Am - F - G 四拍一换。",
-            steps: [
-                "每 4 拍切换一次和弦：C → Am → F（可切换大/小横按）→ G。",
-                "第 4 拍后半拍提前在脑海预演下一和弦指型，做到全指同步落弦。",
-                "每换一个和弦可分解弹响 6 根弦自检，保证颗颗清晰无杂音。"
-            ],
-            visualizerKind: .chordsBasic
-        ),
-        ExerciseItem(
-            id: "lv5_ext",
-            level: .lv5,
-            name: "进阶和弦 Fmaj7 - Bm7 - Cadd9 - G",
-            badge: "指弹进阶",
-            durationMinutes: 3,
-            defaultBPM: 58,
-            recommendedBPMText: "55–65 BPM · 四拍换一次",
-            tip: "结合小指保留指与中指/无名指反向跨弦的高阶实战转换",
-            transitionPrompt: "回到低把位，准备高阶和弦 Fmaj7 - Bm7 - Cadd9 - G 转换。",
-            steps: [
-                "Fmaj7 → Bm7 练习横按与中指、无名指快速精准重组。",
-                "Cadd9 → G 时保持无名指/小指固定在 1-2 弦 3 品作保留指，仅移动食指与中指。",
-                "追求声部不断裂的丝滑衔接感。"
-            ],
-            visualizerKind: .chordsExtended
-        ),
-        ExerciseItem(
-            id: "lv5_barre_shift",
-            level: .lv5,
-            name: "大横按全把位平移 (F - G - Am - Em)",
-            badge: "横按耐力",
-            durationMinutes: 3,
-            defaultBPM: 55,
-            recommendedBPMText: "50–60 BPM · 1/3/5/7品平移",
-            tip: "换把瞬间虎口与食指微松「滑过去」再落力，绝不死捏琴颈硬拖",
-            transitionPrompt: "食指准备 1 品大横按 F，体验 1→3→5→7 品呼吸式横按平移。",
-            steps: [
-                "全部使用大横按指型：F(1品) → G(3品) → Am(5品) → Em(7品)。",
-                "第 4 拍末尾瞬间卸力轻触琴弦滑移到目标品位，第 1 拍干脆压实发声。",
-                "养成「按响即松、借力不硬捏」的高手省力习惯。"
-            ],
-            visualizerKind: .chordsBarreShift
-        ),
-
-        // ==================== Lv.6 征服指板 (3项 · 终极 Boss) ====================
+        // ==================== Lv.5 征服指板 (3项 · 主线终极 Boss) ====================
         ExerciseItem(
             id: "lv6_cruise",
-            level: .lv6,
+            level: .lv5,
             name: "全指板蛇形巡航 (1品 ↔ 12品)",
             badge: "宽窄品距通吃",
             durationMinutes: 4,
             defaultBPM: 60,
             recommendedBPMText: "60 BPM · 动态换把",
             tip: "每到 1 弦或 6 弦边界自动顺移一品，拇指务必随食指同步平移",
-            transitionPrompt: "终极挑战！从 6 弦 1 品起步，跟随指板滑动一路征服到 12 品。",
+            transitionPrompt: "主线终极挑战！从 6 弦 1 品起步，跟随指板滑动一路征服到 12 品。",
             steps: [
                 "从 6 弦 1 品起步（1–4 品宽把位），按 1-2-3-4 逐弦爬上 1 弦。",
                 "到达 1 弦后整体右移 1 品（2–5 品），再从 1 弦退回 6 弦，一路蛇形推进至 9–12 品。",
@@ -621,7 +586,7 @@ struct ExerciseItem: Identifiable, Hashable {
         ),
         ExerciseItem(
             id: "lv6_diagonal",
-            level: .lv6,
+            level: .lv5,
             name: "斜穿全指板 (对角线跨把换弦)",
             badge: "换弦+换把合一",
             durationMinutes: 3,
@@ -638,7 +603,7 @@ struct ExerciseItem: Identifiable, Hashable {
         ),
         ExerciseItem(
             id: "lv6_demon_cruise",
-            level: .lv6,
+            level: .lv5,
             name: "全指板魔鬼指序巡航 (1-3-2-4)",
             badge: "终极 Boss",
             durationMinutes: 4,
@@ -652,6 +617,110 @@ struct ExerciseItem: Identifiable, Hashable {
                 "能以 60 BPM 全程无酸胀完成，你的左手独立性已达到准演奏级水准！"
             ],
             visualizerKind: .fretboardCruise(order: [0, 2, 1, 3])
+        ),
+
+        // ==================== 和弦实战支线 (6项 · 由浅入深) ====================
+        ExerciseItem(
+            id: "lv5_camfg",
+            level: .chords,
+            name: "C - Am - F - G 经典开放转换",
+            badge: "入门 · 开放/横按",
+            durationMinutes: 2,
+            defaultBPM: 60,
+            recommendedBPMText: "60 BPM · 四拍一换",
+            tip: "重点关注 Am→F 与 F→G 时中指与无名指在 3、4、5 弦同步分叉",
+            transitionPrompt: "轻甩左手回到低把位，准备 C - Am - F - G 四拍一换。",
+            steps: [
+                "每 4 拍切换一次和弦：C → Am → F（可切换大/小横按）→ G。",
+                "第 4 拍后半拍提前在脑海预演下一和弦指型，做到全指同步落弦。",
+                "每换一个和弦可分解弹响 6 根弦自检，保证颗颗清晰无杂音。"
+            ],
+            visualizerKind: .chordsBasic
+        ),
+        ExerciseItem(
+            id: "lv5_ext",
+            level: .chords,
+            name: "指弹保留指 (Fmaj7 - Bm7 - Cadd9 - G)",
+            badge: "进阶 · 保留指",
+            durationMinutes: 3,
+            defaultBPM: 58,
+            recommendedBPMText: "55–65 BPM · 四拍一换",
+            tip: "结合小指保留指与中指/无名指反向跨弦的高阶实战转换",
+            transitionPrompt: "回到低把位，准备指弹保留指和弦 Fmaj7 - Bm7 - Cadd9 - G。",
+            steps: [
+                "Fmaj7 → Bm7 练习横按与中指、无名指快速精准重组。",
+                "Cadd9 → G 时保持无名指/小指固定在 1-2 弦 3 品作保留指，仅移动食指与中指。",
+                "追求声部不断裂的丝滑衔接感。"
+            ],
+            visualizerKind: .chordsExtended
+        ),
+        ExerciseItem(
+            id: "chord_wide_voicing",
+            level: .chords,
+            name: "宽指距色彩和弦 (Gadd9 - Em9 - Cmaj9 - Dadd9/F#)",
+            badge: "中阶 · 跨度扩张",
+            durationMinutes: 3,
+            defaultBPM: 54,
+            recommendedBPMText: "50–60 BPM · 色彩扩展",
+            tip: "将 Lv.4 隔品扩张直接融入流行与指弹高频色彩和弦，空弦音必须清亮不闷",
+            transitionPrompt: "拇指放于琴颈中线偏下，准备宽指距色彩和弦 Gadd9 - Em9 - Cmaj9 - Dadd9/F#。",
+            steps: [
+                "Gadd9(3-2-0-2-0-3) → Em9(0-2-4-0-3-0)：小指跨到 4 弦 4 品，注意绝不碰闷 3 弦空弦。",
+                "Em9 → Cmaj9(x-3-2-4-3-0)：中指 5 弦 3 品、小指 3 弦 4 品形成大跨度分叉。",
+                "Cmaj9 → Dadd9/F#(2-0-0-2-3-0)：食指稳按 6 弦 2 品低音，保持 4 弦与 1 弦空弦通透。"
+            ],
+            visualizerKind: .chordsWideVoicing
+        ),
+        ExerciseItem(
+            id: "lv5_barre_shift",
+            level: .chords,
+            name: "大横按全把位平移 (F - G - Am - Em)",
+            badge: "高阶 · 横按耐力",
+            durationMinutes: 3,
+            defaultBPM: 55,
+            recommendedBPMText: "50–60 BPM · 1/3/5/7品",
+            tip: "换把瞬间虎口与食指微松「滑过去」再落力，绝不死捏琴颈硬拖",
+            transitionPrompt: "食指准备 1 品大横按 F，体验 1→3→5→7 品呼吸式横按平移。",
+            steps: [
+                "全部使用大横按指型：F(1品) → G(3品) → Am(5品) → Em(7品)。",
+                "第 4 拍末尾瞬间卸力轻触琴弦滑移到目标品位，第 1 拍干脆压实发声。",
+                "养成「按响即松、借力不硬捏」的高手省力习惯。"
+            ],
+            visualizerKind: .chordsBarreShift
+        ),
+        ExerciseItem(
+            id: "chord_ashape_barre",
+            level: .chords,
+            name: "A型横按与弱指独立 (C#m7 - B - Aadd9 - E)",
+            badge: "高阶 · 弱指横按",
+            durationMinutes: 3,
+            defaultBPM: 54,
+            recommendedBPMText: "50–60 BPM · E调经典",
+            tip: "专攻 A 型大横按中无名指/小指独立折指与精准让开 1 弦",
+            transitionPrompt: "食指移至 4 品准备 C#m7，进入 E 调 A 型横按与弱指独立训练。",
+            steps: [
+                "C#m7(4品横按) → B(2品 A 型横按)：中无名小指紧凑贴合或无名指小横按，注意 1 弦 2 品清晰。",
+                "B → Aadd9(x-0-2-4-2-0)：食指按 4 弦 2 品、中指 2 弦 2 品、小指跨 3 弦 4 品。",
+                "Aadd9 → E(0-2-2-1-0-0)：体会松弛归位后的丰满共鸣。"
+            ],
+            visualizerKind: .chordsAShapeBarre
+        ),
+        ExerciseItem(
+            id: "chord_jazz_251",
+            level: .chords,
+            name: "爵士/R&B 独立声部 (Dm9 - G13 - Cmaj9 - A7#5)",
+            badge: "大师 · 四指全独立",
+            durationMinutes: 3,
+            defaultBPM: 52,
+            recommendedBPMText: "48–58 BPM · 爵士 2-5-1-6",
+            tip: "无任何空弦依赖，四根手指每拍同步落到完全不同的品格与弦位",
+            transitionPrompt: "移至 3–6 品中把位，准备爵士/R&B 终极四指独立声部 Dm9 - G13 - Cmaj9 - A7#5。",
+            steps: [
+                "Dm9(x-5-3-5-5-x) → G13(3-x-3-4-5-x)：食指同时控制低音与 4 弦，中指与无名指精准错位。",
+                "G13 → Cmaj9(x-3-2-4-3-x)：四指独立落弦，每根弦都由不同手指负责。",
+                "Cmaj9 → A7#5(5-x-5-6-6-x)：整体滑至 5 品完成极具律动感的属七增五解决。"
+            ],
+            visualizerKind: .chordsJazz251
         )
     ]
 
@@ -975,7 +1044,7 @@ struct PracticePrinciple: Identifiable {
         PracticePrinciple(
             title: "换把先动拇指（全指板要领）",
             subtitle: "征服 1–12 品的省力核心",
-            detail: "在 Lv.6 征服指板跨把位平移时，手臂带动手腕与拇指整体滑行，切忌手指硬伸而拇指留在原把位。",
+            detail: "在 Lv.5 征服指板跨把位平移时，手臂带动手腕与拇指整体滑行，切忌手指硬伸而拇指留在原把位。",
             icon: "crown.fill",
             color: Color(red: 0.93, green: 0.46, blue: 0.18)
         )

@@ -24,6 +24,7 @@ struct LevelTestView: View {
     @State private var finalRank: ProficiencyRank = .unranked
     @State private var lastAudioSummary: AudioTestMetrics? = nil
     @State private var appliedTestSpeedAdjustment: Bool = false
+    @State private var newlyUnlockedLevels: [TrainingLevel] = []
 
     private let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -119,6 +120,14 @@ struct LevelTestView: View {
                 Text("\(spec.durationSeconds) 秒")
                     .font(.caption.bold().monospacedDigit())
                     .foregroundStyle(.secondary)
+            }
+            if !store.isUnlocked(level) && finalScore == nil {
+                Label("跳级考核模式 · 达到 B 级（65%）立即解锁本阶段", systemImage: "lock.open.fill")
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.orange.opacity(0.16), in: Capsule())
+                    .foregroundStyle(.orange)
             }
             Text(spec.title)
                 .font(.headline)
@@ -434,6 +443,24 @@ struct LevelTestView: View {
                 }
             }
 
+            if !newlyUnlockedLevels.isEmpty {
+                let names = newlyUnlockedLevels.map { "\($0.code) \($0.title)" }.joined(separator: "、")
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.open.fill")
+                        .font(.subheadline.bold())
+                    Text("已解锁新阶段：\(names)")
+                        .font(.subheadline.bold())
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(
+                    LinearGradient(colors: [.green, level.accentColor], startPoint: .leading, endPoint: .trailing),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+            }
+
             Text(rank.advice)
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
@@ -522,6 +549,7 @@ struct LevelTestView: View {
         manualLinkages = 0
         noForearmTension = false
         appliedTestSpeedAdjustment = false
+        newlyUnlockedLevels = []
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil
@@ -586,7 +614,7 @@ struct LevelTestView: View {
                 let perf = (audio.rhythmAccuracy * 45.0) + (audio.pitchAccuracy * 25.0) + (audio.clarityScore * 15.0)
                 rawScore = perf * selectedTier.speedWeight + relaxPoints
             } else {
-                // Single-note stages (Lv.2–Lv.4, Lv.6): Pitch 40% + Rhythm 30% + Clarity 15% + Relaxation 15%
+                // Single-note stages (Lv.2–Lv.5): Pitch 40% + Rhythm 30% + Clarity 15% + Relaxation 15%
                 let perf = (audio.pitchAccuracy * 40.0) + (audio.rhythmAccuracy * 30.0) + (audio.clarityScore * 15.0)
                 rawScore = perf * selectedTier.speedWeight + relaxPoints
             }
@@ -603,7 +631,7 @@ struct LevelTestView: View {
         finalScore = clamped
         finalRank = rank
         showPostCheck = false
-        store.recordTestResult(for: level, score: clamped, tier: selectedTier)
+        newlyUnlockedLevels = store.recordTestResult(for: level, score: clamped, tier: selectedTier)
     }
 
     private func resetTestState() {
@@ -613,6 +641,7 @@ struct LevelTestView: View {
         manualLinkages = 0
         noForearmTension = false
         appliedTestSpeedAdjustment = false
+        newlyUnlockedLevels = []
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil

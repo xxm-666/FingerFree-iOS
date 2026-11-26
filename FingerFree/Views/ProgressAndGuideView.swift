@@ -78,15 +78,16 @@ struct ProgressAndGuideView: View {
     // MARK: - 6-Axis Skill Radar Chart
 
     private var radarCard: some View {
-        let values = TrainingLevel.allCases.map { Double(store.mastery(for: $0).bestScore) / 100.0 }
-        let labels = TrainingLevel.allCases.map { $0.title }
+        let levels = TrainingLevel.displayOrder
+        let values = levels.map { Double(store.mastery(for: $0).bestScore) / 100.0 }
+        let labels = levels.map { $0.title }
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("六维左手独立性雷达")
                     .font(.subheadline.bold())
                 Spacer()
-                Text("基于各阶段考核实时更新")
+                Text("5 级指法主线 + 和弦实战")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -102,9 +103,11 @@ struct ProgressAndGuideView: View {
 
     private var masteryGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            ForEach(TrainingLevel.allCases) { level in
+            ForEach(TrainingLevel.displayOrder) { level in
                 let m = store.mastery(for: level)
+                let unlocked = store.isUnlocked(level)
                 let detailText: String = {
+                    if !unlocked { return "未解锁 · 点击跳级考核" }
                     if m.bestScore == 0 { return "未考核 · 点击测试" }
                     if m.lastScore != m.bestScore {
                         return "最高 \(m.bestScore)% · 最近 \(m.lastScore)%"
@@ -116,20 +119,26 @@ struct ProgressAndGuideView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("\(level.code) \(level.title)")
+                            Text(level.isMainTrack ? "\(level.code) \(level.title)" : level.title)
                                 .font(.caption.bold())
-                                .foregroundStyle(level.accentColor)
+                                .foregroundStyle(unlocked ? level.accentColor : .secondary)
                             Spacer()
-                            Text(m.bestRank.rawValue)
-                                .font(.caption.bold())
-                                .foregroundStyle(.primary)
+                            if !unlocked {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(m.bestRank.rawValue)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.primary)
+                            }
                         }
 
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(Color.primary.opacity(0.1))
                                 Capsule()
-                                    .fill(level.accentColor)
+                                    .fill(unlocked ? level.accentColor : Color.secondary)
                                     .frame(width: max(4, geo.size.width * CGFloat(m.bestScore) / 100.0))
                             }
                         }
@@ -142,6 +151,7 @@ struct ProgressAndGuideView: View {
                     }
                     .padding(12)
                     .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .opacity(unlocked ? 1.0 : 0.78)
                 }
                 .buttonStyle(.plain)
             }
@@ -215,7 +225,7 @@ struct ProgressAndGuideView: View {
             }
             Divider().padding(.leading, 14)
 
-            preferenceRow(title: "Lv.5 F 和弦指法") {
+            preferenceRow(title: "和弦实战 F 指法") {
                 Picker("F 和弦指法", selection: $store.fChordStyle) {
                     ForEach(FChordStyle.allCases) { style in
                         Text(style.rawValue).tag(style)
