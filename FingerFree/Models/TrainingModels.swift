@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - 5 Progressive Training Levels (Easy -> Hard)
+// MARK: - 6 Progressive Training Levels (Easy -> Master Boss)
 
 enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
     case lv1 = 1
@@ -8,6 +8,7 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
     case lv3 = 3
     case lv4 = 4
     case lv5 = 5
+    case lv6 = 6
 
     var id: Int { rawValue }
 
@@ -20,6 +21,7 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv3: return "专项剥离"
         case .lv4: return "扩张与爆发"
         case .lv5: return "实战融合"
+        case .lv6: return "征服指板"
         }
     }
 
@@ -27,19 +29,21 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         switch self {
         case .lv1: return "入门 · 无琴可练"
         case .lv2: return "基础 · 保留指"
-        case .lv3: return "核心 · 破2-3联动"
+        case .lv3: return "核心 · 破联动"
         case .lv4: return "高阶 · 跨度/圆滑音"
-        case .lv5: return "大师 · 和弦应用"
+        case .lv5: return "大师 · 和弦实战"
+        case .lv6: return "终极 · 1–12品全指板"
         }
     }
 
     var summary: String {
         switch self {
         case .lv1: return "建立大脑皮层对单指的独立控制通路，彻底消除中指与无名指下意识伴随翘起。"
-        case .lv2: return "落实「一毫米原则」与「保留指」，让手指贴弦行走、换弦不抬飞。"
-        case .lv3: return "锁定食指与小指，集中火力撕开中指与无名指共享肌腱的联动枷锁。"
-        case .lv4: return "拉伸指间蹼膜解决大横按吃力，并用纯左手打勾弦练出指尖独立爆发力。"
-        case .lv5: return "将手指独立性与扩张力转化为实战和弦零延迟切换，做到音色颗颗清晰。"
+        case .lv2: return "落实「一毫米原则」与「保留指」，覆盖顺序、逆序与交错指法，消除换弦乱飞。"
+        case .lv3: return "双指锁定锚点，集中撕开中指/无名指以及无名指/小指的共享肌腱联动。"
+        case .lv4: return "循序拉伸指间蹼膜解决大横按吃力，并用纯左手打勾弦练出指尖独立爆发力。"
+        case .lv5: return "将独立性与扩张力转化为实战开放和弦、进阶和弦与大横按平移零延迟切换。"
+        case .lv6: return "终极挑战：打通 1–4 品宽品距到 9–12 品窄品距，在全指板移动换把中保持绝对独立（建议 Lv.2–4 达标后挑战）。"
         }
     }
 
@@ -50,6 +54,7 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv3: return "scope"
         case .lv4: return "bolt.fill"
         case .lv5: return "music.quarternote.3"
+        case .lv6: return "crown.fill"
         }
     }
 
@@ -60,10 +65,11 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv3: return Color(red: 0.95, green: 0.30, blue: 0.42)
         case .lv4: return Color(red: 0.65, green: 0.35, blue: 0.96)
         case .lv5: return Color(red: 0.14, green: 0.76, blue: 0.52)
+        case .lv6: return Color(red: 0.93, green: 0.46, blue: 0.18)
         }
     }
 
-    /// Lv.1 Wakeup requires NO microphone audio test; Lv.2–Lv.5 use real-time microphone audio analysis.
+    /// Lv.1 Wakeup requires NO microphone audio test; Lv.2–Lv.6 use real-time microphone audio analysis.
     var usesAudioTest: Bool {
         self != .lv1
     }
@@ -148,23 +154,42 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
                 ],
                 requirement: "C - Am - F - G 每四拍切换一次，麦克风实时检测换和弦第 1 拍的扫弦起音准点率与和弦音色饱满度。"
             )
+        case .lv6:
+            return LevelTestSpec(
+                level: .lv6,
+                title: "Lv.6 征服全指板实时音频通关赛",
+                durationSeconds: 60,
+                usesAudioAnalysis: true,
+                testExerciseId: "lv6_diagonal",
+                tiers: [
+                    TestSpeedTier(name: "达标", bpm: 60, speedWeight: 0.85),
+                    TestSpeedTier(name: "进阶", bpm: 75, speedWeight: 0.95),
+                    TestSpeedTier(name: "大师", bpm: 90, speedWeight: 1.00)
+                ],
+                requirement: "从 6 弦 1 品一路斜穿换把直达 1 弦 12 品并折返，麦克风逐音验收宽把位与窄把位的音准、换把同步与清晰度。"
+            )
         }
     }
 }
 
-// MARK: - Visualizer Kinds & Detailed Exercises
+// MARK: - Visualizer Kinds & Detailed Exercises (22 Curated Drills)
 
 enum ExerciseVisualizerKind: Hashable, Codable {
     case handTap
     case handStar
     case handVulcan
+    case handRoll
     case spider(order: [Int], frets: [Int])
     case isolation
     case scissor
+    case ringPinkyIsolation
     case xStretch
     case trill
     case chordsBasic
     case chordsExtended
+    case chordsBarreShift
+    case fretboardCruise(order: [Int])
+    case fretboardDiagonal
 }
 
 struct ExerciseItem: Identifiable, Hashable {
@@ -203,8 +228,13 @@ struct ExerciseItem: Identifiable, Hashable {
             let midi = GuitarPitchHelper.midiNote(string: s, fret: f)
             return (midi, "\(s)弦\(f)品 \(GuitarPitchHelper.noteName(forMIDI: midi))")
 
+        case .ringPinkyIsolation:
+            let steps: [(Int, Int)] = [(4, 7), (2, 8), (2, 7), (4, 8)]
+            let (s, f) = steps[(beatNumber - 1) % 4]
+            let midi = GuitarPitchHelper.midiNote(string: s, fret: f)
+            return (midi, "\(s)弦\(f)品 \(GuitarPitchHelper.noteName(forMIDI: midi))")
+
         case .scissor:
-            // Two notes plucked or alternated; target middle finger on odd, ring finger on even
             let odd = (beatNumber % 2 == 1)
             let (s, f) = odd ? (4, 6) : (4, 7)
             let midi = GuitarPitchHelper.midiNote(string: s, fret: f)
@@ -222,13 +252,23 @@ struct ExerciseItem: Identifiable, Hashable {
             let midi = GuitarPitchHelper.midiNote(string: 3, fret: f)
             return (midi, "3弦\(f)品 \(GuitarPitchHelper.noteName(forMIDI: midi))")
 
-        case .handTap, .handStar, .handVulcan, .chordsBasic, .chordsExtended:
+        case .fretboardCruise(let order):
+            let pos = FretboardCruiseHelper.state(atBeat: beatNumber, order: order)
+            let midi = GuitarPitchHelper.midiNote(string: pos.string, fret: pos.activeFret)
+            return (midi, "\(pos.string)弦\(pos.activeFret)品 \(GuitarPitchHelper.noteName(forMIDI: midi))")
+
+        case .fretboardDiagonal:
+            let pos = FretboardDiagonalHelper.state(atBeat: beatNumber)
+            let midi = GuitarPitchHelper.midiNote(string: pos.string, fret: pos.activeFret)
+            return (midi, "\(pos.string)弦\(pos.activeFret)品 \(GuitarPitchHelper.noteName(forMIDI: midi))")
+
+        case .handTap, .handStar, .handVulcan, .handRoll, .chordsBasic, .chordsExtended, .chordsBarreShift:
             return nil
         }
     }
 
     static let all: [ExerciseItem] = [
-        // Lv.1 神经唤醒
+        // ==================== Lv.1 神经唤醒 (4项) ====================
         ExerciseItem(
             id: "lv1_desk",
             level: .lv1,
@@ -280,8 +320,25 @@ struct ExerciseItem: Identifiable, Hashable {
             ],
             visualizerKind: .handVulcan
         ),
+        ExerciseItem(
+            id: "lv1_roll",
+            level: .lv1,
+            name: "桌面四指波浪滚奏 (1-2-3-4-3-2)",
+            badge: "流畅连贯",
+            durationMinutes: 2,
+            defaultBPM: 65,
+            recommendedBPMText: "65 BPM · 均匀波浪",
+            tip: "重点听无名指落桌的声音是否与食指/中指完全等距均匀",
+            transitionPrompt: "四指虚握贴桌面，准备按 1-2-3-4-3-2 顺序做均匀波浪敲击。",
+            steps: [
+                "四指自然弯曲轻放桌面，随节拍依次单指轻敲：食→中→无名→小→无名→中。",
+                "特别留意「中→无名→小」这一段是否出现黏连或抢拍。",
+                "像钢琴滚奏一样追求每一拍时值完全均匀，手背保持松弛。"
+            ],
+            visualizerKind: .handRoll
+        ),
 
-        // Lv.2 基础定型
+        // ==================== Lv.2 基础定型 (4项) ====================
         ExerciseItem(
             id: "lv2_1234",
             level: .lv2,
@@ -298,6 +355,23 @@ struct ExerciseItem: Identifiable, Hashable {
                 "逐弦上行至 1 弦后再逐弦返回 6 弦，指尖离弦控制在 1–2 毫米以内。"
             ],
             visualizerKind: .spider(order: [0, 1, 2, 3], frets: [5, 6, 7, 8])
+        ),
+        ExerciseItem(
+            id: "lv2_4321",
+            level: .lv2,
+            name: "逆序弱指起手爬格子 4-3-2-1",
+            badge: "弱指激活",
+            durationMinutes: 2,
+            defaultBPM: 60,
+            recommendedBPMText: "55–65 BPM · 小指先动",
+            tip: "由小指率先换弦定位，彻底扭转「只靠食指带路」的惯性",
+            transitionPrompt: "四指放到 6 弦 5–8 品，准备从小指（8品）起手逆序爬格子。",
+            steps: [
+                "每根弦按「小指(8品) → 无名指(7品) → 中指(6品) → 食指(5品)」顺序弹奏。",
+                "换弦时先单独移动小指，其余三指继续保留在上一根弦上。",
+                "确保小指指尖立起垂直压弦，不要塌陷倒平。"
+            ],
+            visualizerKind: .spider(order: [3, 2, 1, 0], frets: [5, 6, 7, 8])
         ),
         ExerciseItem(
             id: "lv2_1324",
@@ -334,7 +408,7 @@ struct ExerciseItem: Identifiable, Hashable {
             visualizerKind: .spider(order: [0, 3, 1, 2], frets: [5, 6, 7, 8])
         ),
 
-        // Lv.3 专项剥离
+        // ==================== Lv.3 专项剥离 (4项) ====================
         ExerciseItem(
             id: "lv3_cross",
             level: .lv3,
@@ -386,17 +460,51 @@ struct ExerciseItem: Identifiable, Hashable {
             ],
             visualizerKind: .spider(order: [1, 3, 0, 2], frets: [5, 6, 7, 8])
         ),
+        ExerciseItem(
+            id: "lv3_34cross",
+            level: .lv3,
+            name: "无名指/小指跨弦剥离",
+            badge: "解放 3-4 指",
+            durationMinutes: 2,
+            defaultBPM: 50,
+            recommendedBPMText: "45–55 BPM · 锁定1-2指",
+            tip: "食指 3弦5品 + 中指 3弦6品锁定，专注剥离最弱的 3-4 指",
+            transitionPrompt: "食指 3 弦 5 品、中指 3 弦 6 品按稳锁定，准备 3-4 指跨弦剥离。",
+            steps: [
+                "食指固定 3 弦 5 品、中指固定 3 弦 6 品全程不松开。",
+                "四拍循环：4弦7品(无名) → 2弦8品(小) → 2弦7品(无名) → 4弦8品(小)。",
+                "手肘自然下垂，避免靠翻转手腕来帮小指够弦。"
+            ],
+            visualizerKind: .ringPinkyIsolation
+        ),
 
-        // Lv.4 扩张与爆发
+        // ==================== Lv.4 扩张与爆发 (4项) ====================
+        ExerciseItem(
+            id: "lv4_wide12",
+            level: .lv4,
+            name: "食中隔品扩张 (5-7-8-9)",
+            badge: "1-2指热身拉伸",
+            durationMinutes: 2,
+            defaultBPM: 55,
+            recommendedBPMText: "50–60 BPM · 温和扩张",
+            tip: "食指(5品)与中指(7品)隔开一品，为大跨度和弦建立基础柔韧性",
+            transitionPrompt: "拇指放于琴颈背面中线偏下，准备 5-7-8-9 食中隔品拉伸。",
+            steps: [
+                "把位调整为 5品(食) - 7品(中) - 8品(无名) - 9品(小)。",
+                "食指向琴头方向自然微倾，其余三指保持紧凑立起。",
+                "感受 1、2 指间指蹼温和展开，全程不耸肩不僵硬。"
+            ],
+            visualizerKind: .spider(order: [0, 1, 2, 3], frets: [5, 7, 8, 9])
+        ),
         ExerciseItem(
             id: "lv4_wide",
             level: .lv4,
-            name: "隔品大跨度拉伸 (5-6-8-9)",
+            name: "中无名隔品拉伸 (5-6-8-9)",
             badge: "2-3指扩张",
             durationMinutes: 3,
             defaultBPM: 52,
             recommendedBPMText: "50–60 BPM · 温和拉伸",
-            tip: "中指(6品)与无名指(8品)隔开一品，温和打开指间蹼膜",
+            tip: "中指(6品)与无名指(8品)隔开一品，温和打开最紧的指间蹼膜",
             transitionPrompt: "拇指移至琴颈背面中线偏下，准备 5-6-8-9 隔品拉伸。",
             steps: [
                 "把位调整为 5品(食) - 6品(中) - 8品(无名) - 9品(小)，重点拉开 2、3 指间距。",
@@ -440,7 +548,7 @@ struct ExerciseItem: Identifiable, Hashable {
             visualizerKind: .trill
         ),
 
-        // Lv.5 实战融合
+        // ==================== Lv.5 实战融合 (3项) ====================
         ExerciseItem(
             id: "lv5_camfg",
             level: .lv5,
@@ -474,24 +582,186 @@ struct ExerciseItem: Identifiable, Hashable {
                 "追求声部不断裂的丝滑衔接感。"
             ],
             visualizerKind: .chordsExtended
+        ),
+        ExerciseItem(
+            id: "lv5_barre_shift",
+            level: .lv5,
+            name: "大横按全把位平移 (F - G - Am - Em)",
+            badge: "横按耐力",
+            durationMinutes: 3,
+            defaultBPM: 55,
+            recommendedBPMText: "50–60 BPM · 1/3/5/7品平移",
+            tip: "换把瞬间虎口与食指微松「滑过去」再落力，绝不死捏琴颈硬拖",
+            transitionPrompt: "食指准备 1 品大横按 F，体验 1→3→5→7 品呼吸式横按平移。",
+            steps: [
+                "全部使用大横按指型：F(1品) → G(3品) → Am(5品) → Em(7品)。",
+                "第 4 拍末尾瞬间卸力轻触琴弦滑移到目标品位，第 1 拍干脆压实发声。",
+                "养成「按响即松、借力不硬捏」的高手省力习惯。"
+            ],
+            visualizerKind: .chordsBarreShift
+        ),
+
+        // ==================== Lv.6 征服指板 (3项 · 终极 Boss) ====================
+        ExerciseItem(
+            id: "lv6_cruise",
+            level: .lv6,
+            name: "全指板蛇形巡航 (1品 ↔ 12品)",
+            badge: "宽窄品距通吃",
+            durationMinutes: 4,
+            defaultBPM: 60,
+            recommendedBPMText: "60 BPM · 动态换把",
+            tip: "每到 1 弦或 6 弦边界自动顺移一品，拇指务必随食指同步平移",
+            transitionPrompt: "终极挑战！从 6 弦 1 品起步，跟随指板滑动一路征服到 12 品。",
+            steps: [
+                "从 6 弦 1 品起步（1–4 品宽把位），按 1-2-3-4 逐弦爬上 1 弦。",
+                "到达 1 弦后整体右移 1 品（2–5 品），再从 1 弦退回 6 弦，一路蛇形推进至 9–12 品。",
+                "感受低把位宽品距拉伸与高把位窄品距精准控制的无缝切换。"
+            ],
+            visualizerKind: .fretboardCruise(order: [0, 1, 2, 3])
+        ),
+        ExerciseItem(
+            id: "lv6_diagonal",
+            level: .lv6,
+            name: "斜穿全指板 (对角线跨把换弦)",
+            badge: "换弦+换把合一",
+            durationMinutes: 3,
+            defaultBPM: 58,
+            recommendedBPMText: "55–65 BPM · 每弦+2品",
+            tip: "每换一根弦顺移 2 品，眼睛提前盯住下一把位食指落点",
+            transitionPrompt: "食指就位 6 弦 1 品，准备每换一弦右移 2 品斜穿至 1 弦 12 品。",
+            steps: [
+                "上行路线：6弦(1-4品) → 5弦(3-6品) → 4弦(5-8品) → 3弦(7-10品) → 2弦(9-12品) → 1弦(9-12品)。",
+                "到达 1 弦 12 品后沿原路倒序斜穿返回 6 弦 1 品。",
+                "这是 Solo 与指弹大跨度跑动的核心基本功，换把时手臂带动手腕整体平移。"
+            ],
+            visualizerKind: .fretboardDiagonal
+        ),
+        ExerciseItem(
+            id: "lv6_demon_cruise",
+            level: .lv6,
+            name: "全指板魔鬼指序巡航 (1-3-2-4)",
+            badge: "终极 Boss",
+            durationMinutes: 4,
+            defaultBPM: 55,
+            recommendedBPMText: "50–60 BPM · 极限独立",
+            tip: "在 1–4 品最宽品距下完成 1-3-2-4 零联动，是左手独立性的终极试金石",
+            transitionPrompt: "终极 Boss 挑战！从 6 弦 1 品起用 1-3-2-4 指序征服 1–12 品。",
+            steps: [
+                "全程使用 1-3-2-4 交错指序，从 1–4 品宽把位蛇形推进至 9–12 品。",
+                "低把位 1–4 品极易诱发中指无名指联动，务必放慢速度坚守一毫米原则。",
+                "能以 60 BPM 全程无酸胀完成，你的左手独立性已达到准演奏级水准！"
+            ],
+            visualizerKind: .fretboardCruise(order: [0, 2, 1, 3])
         )
     ]
-
-    /// Classic 10-minute warm-up sequence (one iconic exercise from Lv.1, Lv.2, Lv.3, Lv.5)
-    static var classicDailyTenMinuteMix: [ExerciseItem] {
-        let ids = ["lv1_desk", "lv2_1234", "lv3_cross", "lv5_camfg"]
-        return ids.compactMap { id in all.first(where: { $0.id == id }) }
-    }
 
     static func find(id: String) -> ExerciseItem? {
         all.first(where: { $0.id == id })
     }
 }
 
+// MARK: - Full Fretboard (1–12) Position Calculators
+
+enum FretboardCruiseHelper {
+    struct StepState {
+        let baseFret: Int    // 1...9 (window covers baseFret ... baseFret+3, reaching 12)
+        let string: Int      // 1...6
+        let activeFingerIdx: Int // 0...3
+        let activeFret: Int
+        let frets: [Int]
+        let movedSet: Set<Int>
+        let prevString: Int
+        let isAscendingFrets: Bool
+    }
+
+    // 16 positions: 1->9 ascending, then 8->2 descending (cycle of 16 positions * 6 strings * 4 beats)
+    private static let baseFretCycle = [1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 7, 6, 5, 4, 3, 2]
+
+    static func state(atBeat beatNumber: Int, order: [Int]) -> StepState {
+        let zeroBased = max(0, beatNumber - 1)
+        let totalStringsPerPos = 6
+        let beatsPerPos = totalStringsPerPos * 4 // 24 beats per position
+
+        let posIdx = (zeroBased / beatsPerPos) % baseFretCycle.count
+        let baseFret = baseFretCycle[posIdx]
+        let frets = [baseFret, baseFret + 1, baseFret + 2, baseFret + 3]
+
+        let beatInPos = zeroBased % beatsPerPos
+        let stringStep = beatInPos / 4 // 0...5
+        let stepInString = beatInPos % 4 // 0...3
+
+        // Snake: even posIdx goes 6->1, odd posIdx goes 1->6
+        let goingHighToLow = (posIdx % 2 == 1)
+        let stringNum = goingHighToLow ? (1 + stringStep) : (6 - stringStep)
+        let prevStringNum: Int
+        if stringStep == 0 {
+            prevStringNum = stringNum
+        } else {
+            prevStringNum = goingHighToLow ? (stringNum - 1) : (stringNum + 1)
+        }
+
+        let activeFingerIdx = order[stepInString]
+        let movedSet = Set(order.prefix(stepInString + 1))
+
+        return StepState(
+            baseFret: baseFret,
+            string: stringNum,
+            activeFingerIdx: activeFingerIdx,
+            activeFret: frets[activeFingerIdx],
+            frets: frets,
+            movedSet: movedSet,
+            prevString: prevStringNum,
+            isAscendingFrets: posIdx < 9
+        )
+    }
+}
+
+enum FretboardDiagonalHelper {
+    struct StepState {
+        let baseFret: Int
+        let string: Int
+        let activeFingerIdx: Int
+        let activeFret: Int
+        let frets: [Int]
+        let isAscending: Bool
+    }
+
+    // 10-phase diagonal cycle: 6(1)->5(3)->4(5)->3(7)->2(9)->1(9) then back 2(7)->3(5)->4(3)->5(1)
+    private static let phases: [(string: Int, baseFret: Int, asc: Bool)] = [
+        (6, 1, true),
+        (5, 3, true),
+        (4, 5, true),
+        (3, 7, true),
+        (2, 9, true),
+        (1, 9, true),
+        (2, 7, false),
+        (3, 5, false),
+        (4, 3, false),
+        (5, 1, false)
+    ]
+
+    static func state(atBeat beatNumber: Int) -> StepState {
+        let zeroBased = max(0, beatNumber - 1)
+        let phaseIdx = (zeroBased / 4) % phases.count
+        let stepInPhase = zeroBased % 4
+        let phase = phases[phaseIdx]
+        let frets = [phase.baseFret, phase.baseFret + 1, phase.baseFret + 2, phase.baseFret + 3]
+        let fingerIdx = phase.asc ? stepInPhase : (3 - stepInPhase)
+
+        return StepState(
+            baseFret: phase.baseFret,
+            string: phase.string,
+            activeFingerIdx: fingerIdx,
+            activeFret: frets[fingerIdx],
+            frets: frets,
+            isAscending: phase.asc
+        )
+    }
+}
+
 // MARK: - Guitar Standard Tuning Pitch Helper
 
 enum GuitarPitchHelper {
-    // Standard tuning open string MIDI numbers: 1=E4(64), 2=B3(59), 3=G3(55), 4=D3(50), 5=A2(45), 6=E2(40)
     private static let openStringMIDI: [Int: Int] = [
         1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40
     ]
@@ -559,7 +829,7 @@ enum ProficiencyRank: String, Codable {
     var advice: String {
         switch self {
         case .s: return "神经控制极其稳固！已解锁下一阶段，并可直接提速 +5 BPM。"
-        case .a: return "已达标并解锁下一阶段！建议日常热身时继续保持。"
+        case .a: return "已达标并解锁下一阶段！建议日常练习时继续保持。"
         case .b: return "基本成型，但仍有轻微失误或联动，建议在当前速度巩固 2–3 天后再复测。"
         case .c: return "检测到较明显失误或紧绷，建议立刻下调 10 BPM 重建清晰神经通路。"
         case .unranked: return "尚未完成本阶段考核。"
@@ -670,11 +940,11 @@ struct PracticePrinciple: Identifiable {
             color: Color(red: 0.14, green: 0.76, blue: 0.52)
         ),
         PracticePrinciple(
-            title: "黄金练习时段",
-            subtitle: "每天练琴前 10 分钟热身",
-            detail: "建议将 10 分钟热身串烧放在每天练琴最开始，此时手部肌肉最放松，大脑皮层建立新神经控制通路的效率最高。",
-            icon: "sunrise.fill",
-            color: Color(red: 0.22, green: 0.72, blue: 0.98)
+            title: "换把先动拇指（全指板要领）",
+            subtitle: "征服 1–12 品的省力核心",
+            detail: "在 Lv.6 征服指板跨把位平移时，手臂带动手腕与拇指整体滑行，切忌手指硬伸而拇指留在原把位。",
+            icon: "crown.fill",
+            color: Color(red: 0.93, green: 0.46, blue: 0.18)
         )
     ]
 }

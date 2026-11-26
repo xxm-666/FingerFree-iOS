@@ -79,7 +79,7 @@ struct ProgressAndGuideView: View {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("五维左手独立性雷达")
+                Text("六维左手独立性雷达")
                     .font(.subheadline.bold())
                 Spacer()
                 Text("基于各阶段考核实时更新")

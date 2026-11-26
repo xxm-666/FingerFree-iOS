@@ -15,69 +15,33 @@ struct ExerciseVisualizerView: View {
             case .handTap:
                 HandTapVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, accentColor: accentColor)
             case .handStar:
-                HandSpreadVisualizer(
-                    totalBeatCount: totalBeatCount,
-                    isRunning: isRunning,
-                    accentColor: accentColor,
-                    mode: .star
-                )
+                HandSpreadVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, accentColor: accentColor, mode: .star)
             case .handVulcan:
-                HandSpreadVisualizer(
-                    totalBeatCount: totalBeatCount,
-                    isRunning: isRunning,
-                    accentColor: accentColor,
-                    mode: .vulcan
-                )
+                HandSpreadVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, accentColor: accentColor, mode: .vulcan)
+            case .handRoll:
+                HandRollVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, accentColor: accentColor)
             case .spider(let order, let frets):
-                SpiderFretboardVisualizer(
-                    totalBeatCount: totalBeatCount,
-                    isRunning: isRunning,
-                    fingerOrder: order,
-                    frets: frets,
-                    accentColor: accentColor
-                )
+                SpiderFretboardVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, fingerOrder: order, frets: frets, accentColor: accentColor)
             case .isolation:
-                IsolationFretboardVisualizer(
-                    currentBeat: currentBeat,
-                    isRunning: isRunning,
-                    accentColor: accentColor
-                )
+                IsolationFretboardVisualizer(currentBeat: currentBeat, isRunning: isRunning, accentColor: accentColor, ringPinkyMode: false)
+            case .ringPinkyIsolation:
+                IsolationFretboardVisualizer(currentBeat: currentBeat, isRunning: isRunning, accentColor: accentColor, ringPinkyMode: true)
             case .scissor:
-                ScissorFretboardVisualizer(
-                    currentBeat: currentBeat,
-                    isRunning: isRunning,
-                    accentColor: accentColor
-                )
+                ScissorFretboardVisualizer(currentBeat: currentBeat, isRunning: isRunning, accentColor: accentColor)
             case .xStretch:
-                XStretchFretboardVisualizer(
-                    currentBeat: currentBeat,
-                    isRunning: isRunning,
-                    accentColor: accentColor
-                )
+                XStretchFretboardVisualizer(currentBeat: currentBeat, isRunning: isRunning, accentColor: accentColor)
             case .trill:
-                TrillFretboardVisualizer(
-                    currentBeat: currentBeat,
-                    isRunning: isRunning,
-                    accentColor: accentColor
-                )
+                TrillFretboardVisualizer(currentBeat: currentBeat, isRunning: isRunning, accentColor: accentColor)
             case .chordsBasic:
-                ChordTransitionVisualizer(
-                    currentBeat: currentBeat,
-                    totalBeatCount: totalBeatCount,
-                    isRunning: isRunning,
-                    fChordStyle: fChordStyle,
-                    extendedSet: false,
-                    accentColor: accentColor
-                )
+                ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .basic, accentColor: accentColor)
             case .chordsExtended:
-                ChordTransitionVisualizer(
-                    currentBeat: currentBeat,
-                    totalBeatCount: totalBeatCount,
-                    isRunning: isRunning,
-                    fChordStyle: fChordStyle,
-                    extendedSet: true,
-                    accentColor: accentColor
-                )
+                ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .extended, accentColor: accentColor)
+            case .chordsBarreShift:
+                ChordTransitionVisualizer(currentBeat: currentBeat, totalBeatCount: totalBeatCount, isRunning: isRunning, fChordStyle: fChordStyle, mode: .barreShift, accentColor: accentColor)
+            case .fretboardCruise(let order):
+                FretboardCruiseVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, order: order, accentColor: accentColor)
+            case .fretboardDiagonal:
+                FretboardDiagonalVisualizer(totalBeatCount: totalBeatCount, isRunning: isRunning, accentColor: accentColor)
             }
         }
         .padding(16)
@@ -141,26 +105,16 @@ private struct HandTapVisualizer: View {
 
         return VStack(spacing: 5) {
             if isLifted {
-                Text("↑ 1-2cm")
-                    .font(.caption2.bold())
-                    .foregroundStyle(accentColor)
+                Text("↑ 1-2cm").font(.caption2.bold()).foregroundStyle(accentColor)
             } else if isLocked {
-                Image(systemName: "lock.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.cyan)
+                Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.cyan)
             } else {
-                Text("静止")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text("静止").font(.caption2).foregroundStyle(.secondary)
             }
 
             VStack(spacing: 3) {
-                Text("\(number)")
-                    .font(.headline.bold())
-                    .foregroundStyle(isLifted ? .white : .primary)
-                Text(name)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(isLifted ? .white.opacity(0.9) : .secondary)
+                Text("\(number)").font(.headline.bold()).foregroundStyle(isLifted ? .white : .primary)
+                Text(name).font(.caption2.weight(.medium)).foregroundStyle(isLifted ? .white.opacity(0.9) : .secondary)
             }
             .frame(width: 54, height: height)
             .background(fill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -208,14 +162,10 @@ private struct HandSpreadVisualizer: View {
                 let offset3: CGFloat = isOpen ? (mode == .star ? 10 : 14) : 0
                 let offset4: CGFloat = (mode == .vulcan && isOpen) ? 14 : 0
 
-                pillFinger(1, "食指", height: 92, locked: mode == .star, active: mode == .vulcan && isOpen)
-                    .offset(x: offset1)
-                pillFinger(2, "中指", height: 108, locked: false, active: isOpen)
-                    .offset(x: offset2)
-                pillFinger(3, "无名", height: 102, locked: false, active: isOpen)
-                    .offset(x: offset3)
-                pillFinger(4, "小指", height: 80, locked: mode == .star, active: mode == .vulcan && isOpen)
-                    .offset(x: offset4)
+                pillFinger(1, "食指", height: 92, locked: mode == .star, active: mode == .vulcan && isOpen).offset(x: offset1)
+                pillFinger(2, "中指", height: 108, locked: false, active: isOpen).offset(x: offset2)
+                pillFinger(3, "无名", height: 102, locked: false, active: isOpen).offset(x: offset3)
+                pillFinger(4, "小指", height: 80, locked: mode == .star, active: mode == .vulcan && isOpen).offset(x: offset4)
             }
             .frame(height: 146)
             .animation(.spring(response: 0.25, dampingFraction: 0.72), value: isOpen)
@@ -242,6 +192,58 @@ private struct HandSpreadVisualizer: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(locked ? Color.cyan : (active ? accentColor : Color.secondary.opacity(0.3)), lineWidth: 1.5)
             )
+        }
+    }
+}
+
+// MARK: - Lv.1-4: 桌面四指波浪滚奏 (1-2-3-4-3-2)
+private struct HandRollVisualizer: View {
+    let totalBeatCount: Int
+    let isRunning: Bool
+    let accentColor: Color
+
+    private static let sequence = [1, 2, 3, 4, 3, 2]
+
+    private var activeFinger: Int {
+        guard isRunning, totalBeatCount > 0 else { return 0 }
+        return Self.sequence[(totalBeatCount - 1) % Self.sequence.count]
+    }
+
+    var body: some View {
+        let names = ["", "食指", "中指", "无名指", "小指"]
+        VStack(spacing: 12) {
+            HStack {
+                Label("波浪滚奏 (1-2-3-4-3-2)", systemImage: "water.waves")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(activeFinger > 0 ? "轻敲 \(names[activeFinger]) (\(activeFinger))" : "四指轻贴桌面")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(accentColor.opacity(0.16), in: Capsule())
+                    .foregroundStyle(accentColor)
+            }
+
+            HStack(alignment: .bottom, spacing: 14) {
+                ForEach([(1, "食指", 90.0), (2, "中指", 108.0), (3, "无名", 100.0), (4, "小指", 78.0)], id: \.0) { num, title, h in
+                    let active = (activeFinger == num)
+                    VStack(spacing: 4) {
+                        Text(active ? "↓ 轻敲" : "·")
+                            .font(.caption2.bold())
+                            .foregroundStyle(active ? accentColor : .secondary)
+                        VStack(spacing: 2) {
+                            Text("\(num)").font(.headline.bold()).foregroundStyle(active ? .white : .primary)
+                            Text(title).font(.caption2).foregroundStyle(active ? .white.opacity(0.9) : .secondary)
+                        }
+                        .frame(width: 54, height: h)
+                        .background(active ? accentColor : Color.secondary.opacity(0.16), in: RoundedRectangle(cornerRadius: 18))
+                        .offset(y: active ? -14 : 0)
+                    }
+                }
+            }
+            .frame(height: 148)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: activeFinger)
         }
     }
 }
@@ -315,18 +317,29 @@ private struct SpiderFretboardVisualizer: View {
     }
 }
 
-// MARK: - Lv.3-1: 中指/无名指跨弦交替
+// MARK: - Lv.3-1 & Lv.3-4: 2-3指 / 3-4指 跨弦剥离
 private struct IsolationFretboardVisualizer: View {
     let currentBeat: Int
     let isRunning: Bool
     let accentColor: Color
+    let ringPinkyMode: Bool
 
-    private let steps: [(beat: Int, finger: Int, string: Int, fret: Int, label: String)] = [
-        (1, 2, 4, 6, "4弦6品"),
-        (2, 3, 2, 7, "2弦7品"),
-        (3, 2, 2, 6, "2弦6品"),
-        (4, 3, 4, 7, "4弦7品")
-    ]
+    private var steps: [(beat: Int, finger: Int, string: Int, fret: Int, label: String)] {
+        if ringPinkyMode {
+            return [
+                (1, 3, 4, 7, "4弦7品"),
+                (2, 4, 2, 8, "2弦8品"),
+                (3, 3, 2, 7, "2弦7品"),
+                (4, 4, 4, 8, "4弦8品")
+            ]
+        }
+        return [
+            (1, 2, 4, 6, "4弦6品"),
+            (2, 3, 2, 7, "2弦7品"),
+            (3, 2, 2, 6, "2弦6品"),
+            (4, 3, 4, 7, "4弦7品")
+        ]
+    }
 
     private var activeStep: (beat: Int, finger: Int, string: Int, fret: Int, label: String)? {
         guard isRunning, currentBeat >= 1, currentBeat <= 4 else { return nil }
@@ -334,13 +347,24 @@ private struct IsolationFretboardVisualizer: View {
     }
 
     private var nodes: [FretboardNode] {
-        var result = [
-            FretboardNode(string: 3, fret: 5, label: "1", style: .locked),
-            FretboardNode(string: 3, fret: 8, label: "4", style: .locked)
-        ]
+        var result: [FretboardNode] = ringPinkyMode
+            ? [
+                FretboardNode(string: 3, fret: 5, label: "1", style: .locked),
+                FretboardNode(string: 3, fret: 6, label: "2", style: .locked)
+            ]
+            : [
+                FretboardNode(string: 3, fret: 5, label: "1", style: .locked),
+                FretboardNode(string: 3, fret: 8, label: "4", style: .locked)
+            ]
+
         if let st = activeStep {
-            let color: Color = st.finger == 2 ? Color(red: 0.96, green: 0.65, blue: 0.22) : accentColor
+            let color: Color = (st.finger == 2 || st.finger == 3) && st.beat % 2 == 1
+                ? Color(red: 0.96, green: 0.65, blue: 0.22)
+                : accentColor
             result.append(FretboardNode(string: st.string, fret: st.fret, label: "\(st.finger)", style: .active(color)))
+        } else if ringPinkyMode {
+            result.append(FretboardNode(string: 4, fret: 7, label: "3", style: .preview))
+            result.append(FretboardNode(string: 2, fret: 8, label: "4", style: .preview))
         } else {
             result.append(FretboardNode(string: 4, fret: 6, label: "2", style: .preview))
             result.append(FretboardNode(string: 2, fret: 7, label: "3", style: .preview))
@@ -349,13 +373,14 @@ private struct IsolationFretboardVisualizer: View {
     }
 
     var body: some View {
+        let names = ["", "食指", "中指", "无名指", "小指"]
         VStack(spacing: 10) {
             HStack {
-                Label("食/小指锁定 3弦", systemImage: "scope")
+                Label(ringPinkyMode ? "食/中指锁定 3弦" : "食/小指锁定 3弦", systemImage: "scope")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(activeStep.map { "\($0.finger == 2 ? "中指" : "无名指") → \($0.label)" } ?? "食指3弦5品 · 小指3弦8品")
+                Text(activeStep.map { "\(names[$0.finger]) → \($0.label)" } ?? (ringPinkyMode ? "食3弦5品 · 中3弦6品" : "食3弦5品 · 小3弦8品"))
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -414,7 +439,7 @@ private struct ScissorFretboardVisualizer: View {
     }
 }
 
-// MARK: - Lv.4-2: X 型四角对角拉伸
+// MARK: - Lv.4-3: X 型四角对角拉伸
 private struct XStretchFretboardVisualizer: View {
     let currentBeat: Int
     let isRunning: Bool
@@ -448,7 +473,7 @@ private struct XStretchFretboardVisualizer: View {
     }
 }
 
-// MARK: - Lv.4-3: 3-4 指纯左手双颤音
+// MARK: - Lv.4-4: 3-4 指纯左手双颤音
 private struct TrillFretboardVisualizer: View {
     let currentBeat: Int
     let isRunning: Bool
@@ -482,18 +507,128 @@ private struct TrillFretboardVisualizer: View {
     }
 }
 
-// MARK: - Lv.5: 和弦转换 (基础 & 进阶)
+// MARK: - Lv.6-1 & 6-3: 全指板蛇形巡航 (1–12 品动态滑动视窗)
+private struct FretboardCruiseVisualizer: View {
+    let totalBeatCount: Int
+    let isRunning: Bool
+    let order: [Int]
+    let accentColor: Color
+
+    var body: some View {
+        let pos = FretboardCruiseHelper.state(atBeat: max(1, totalBeatCount), order: order)
+        let names = ["食指", "中指", "无名指", "小指"]
+
+        let nodes: [FretboardNode] = (0..<4).map { idx in
+            let hasMoved = (isRunning && totalBeatCount > 0) ? pos.movedSet.contains(idx) : true
+            let s = hasMoved ? pos.string : pos.prevString
+            let isActive = isRunning && totalBeatCount > 0 && idx == pos.activeFingerIdx
+            return FretboardNode(
+                string: s,
+                fret: pos.frets[idx],
+                label: "\(idx + 1)",
+                style: isActive ? .active(accentColor) : .held
+            )
+        }
+
+        VStack(spacing: 10) {
+            HStack {
+                Label("把位 \(pos.baseFret)–\(pos.baseFret + 3)品 · \(pos.isAscendingFrets ? "→ 推向12品" : "← 返回1品")", systemImage: "crown.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(isRunning && totalBeatCount > 0 ? "\(names[pos.activeFingerIdx]) → \(pos.string)弦\(pos.activeFret)品" : "起点：6弦1品")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(accentColor.opacity(0.16), in: Capsule())
+                    .foregroundStyle(accentColor)
+            }
+
+            FullFretboardOverviewBar(activeRange: pos.baseFret...(pos.baseFret + 3), accentColor: accentColor)
+
+            FretboardGrid(frets: pos.frets, nodes: nodes)
+                .frame(height: 150)
+        }
+    }
+}
+
+// MARK: - Lv.6-2: 斜穿全指板 (对角线跨把换弦 1–12 品)
+private struct FretboardDiagonalVisualizer: View {
+    let totalBeatCount: Int
+    let isRunning: Bool
+    let accentColor: Color
+
+    var body: some View {
+        let pos = FretboardDiagonalHelper.state(atBeat: max(1, totalBeatCount))
+        let names = ["食指", "中指", "无名指", "小指"]
+
+        let nodes: [FretboardNode] = (0..<4).map { idx in
+            let isActive = isRunning && totalBeatCount > 0 && idx == pos.activeFingerIdx
+            return FretboardNode(
+                string: pos.string,
+                fret: pos.frets[idx],
+                label: "\(idx + 1)",
+                style: isActive ? .active(accentColor) : .preview
+            )
+        }
+
+        VStack(spacing: 10) {
+            HStack {
+                Label("斜穿把位 \(pos.baseFret)–\(pos.baseFret + 3)品 · \(pos.isAscending ? "↗ 冲向12品" : "↙ 折返1品")", systemImage: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(isRunning && totalBeatCount > 0 ? "\(names[pos.activeFingerIdx]) → \(pos.string)弦\(pos.activeFret)品" : "起点：6弦1品")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(accentColor.opacity(0.16), in: Capsule())
+                    .foregroundStyle(accentColor)
+            }
+
+            FullFretboardOverviewBar(activeRange: pos.baseFret...(pos.baseFret + 3), accentColor: accentColor)
+
+            FretboardGrid(frets: pos.frets, nodes: nodes)
+                .frame(height: 150)
+        }
+    }
+}
+
+// MARK: - 1–12 Fret Global Overview Strip for Lv.6
+private struct FullFretboardOverviewBar: View {
+    let activeRange: ClosedRange<Int>
+    let accentColor: Color
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(1...12, id: \.self) { fret in
+                let active = activeRange.contains(fret)
+                Text("\(fret)")
+                    .font(.system(size: 9, weight: active ? .bold : .medium, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(active ? accentColor : Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
+                    .foregroundStyle(active ? .white : .secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Lv.5: 和弦转换 (基础 / 进阶 / 大横按平移)
 private struct ChordTransitionVisualizer: View {
+    enum Mode { case basic, extended, barreShift }
+
     let currentBeat: Int
     let totalBeatCount: Int
     let isRunning: Bool
     let fChordStyle: FChordStyle
-    let extendedSet: Bool
+    let mode: Mode
     let accentColor: Color
 
     private struct ChordSpec {
         let name: String
         let subtitle: String
+        let baseFretLabel: String?
         let dots: [(string: Int, fret: Int, finger: Int)]
         let mutedStrings: Set<Int>
         let openStrings: Set<Int>
@@ -503,25 +638,33 @@ private struct ChordTransitionVisualizer: View {
     }
 
     private var chords: [ChordSpec] {
-        if extendedSet {
+        switch mode {
+        case .extended:
             return [
-                ChordSpec(name: "Fmaj7", subtitle: "大七和弦", dots: [(2, 1, 1), (3, 2, 2), (4, 3, 3)], mutedStrings: [6, 5], openStrings: [1], barreFret: nil, barreStringRange: nil, focusNote: "1弦空弦保持明亮，中指无名指阶梯立起"),
-                ChordSpec(name: "Bm7", subtitle: "小七横按", dots: [(2, 3, 2), (4, 4, 3)], mutedStrings: [6], openStrings: [], barreFret: 2, barreStringRange: 1...5, focusNote: "食指2品横按，中指2弦3品与无名指4弦4品分叉"),
-                ChordSpec(name: "Cadd9", subtitle: "加九和弦", dots: [(4, 2, 1), (5, 3, 2), (2, 3, 3), (1, 3, 4)], mutedStrings: [6], openStrings: [3], barreFret: nil, barreStringRange: nil, focusNote: "无名指与小指锁死1-2弦3品作保留指"),
-                ChordSpec(name: "G", subtitle: "大三和弦", dots: [(5, 2, 1), (6, 3, 2), (2, 3, 3), (1, 3, 4)], mutedStrings: [], openStrings: [3, 4], barreFret: nil, barreStringRange: nil, focusNote: "3-4指不动，仅食指与中指同步上移一根弦")
+                ChordSpec(name: "Fmaj7", subtitle: "大七和弦", baseFretLabel: nil, dots: [(2, 1, 1), (3, 2, 2), (4, 3, 3)], mutedStrings: [6, 5], openStrings: [1], barreFret: nil, barreStringRange: nil, focusNote: "1弦空弦保持明亮，中指无名指阶梯立起"),
+                ChordSpec(name: "Bm7", subtitle: "小七横按", baseFretLabel: nil, dots: [(2, 3, 2), (4, 4, 3)], mutedStrings: [6], openStrings: [], barreFret: 2, barreStringRange: 1...5, focusNote: "食指2品横按，中指2弦3品与无名指4弦4品分叉"),
+                ChordSpec(name: "Cadd9", subtitle: "加九和弦", baseFretLabel: nil, dots: [(4, 2, 1), (5, 3, 2), (2, 3, 3), (1, 3, 4)], mutedStrings: [6], openStrings: [3], barreFret: nil, barreStringRange: nil, focusNote: "无名指与小指锁死1-2弦3品作保留指"),
+                ChordSpec(name: "G", subtitle: "大三和弦", baseFretLabel: nil, dots: [(5, 2, 1), (6, 3, 2), (2, 3, 3), (1, 3, 4)], mutedStrings: [], openStrings: [3, 4], barreFret: nil, barreStringRange: nil, focusNote: "3-4指不动，仅食指与中指同步上移一根弦")
+            ]
+        case .barreShift:
+            return [
+                ChordSpec(name: "F", subtitle: "1品大横按", baseFretLabel: "1品", dots: [(3, 2, 2), (5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "1品稳固压实，准备第4拍尾微松滑向3品"),
+                ChordSpec(name: "G", subtitle: "3品大横按", baseFretLabel: "3品", dots: [(3, 2, 2), (5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "保持E型手型整体平移2品，绝不散架"),
+                ChordSpec(name: "Am", subtitle: "5品小调横按", baseFretLabel: "5品", dots: [(5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "抬起中指转为Em型大横按，手腕保持松弛"),
+                ChordSpec(name: "Em", subtitle: "7品A型横按", baseFretLabel: "7品", dots: [(2, 2, 2), (4, 3, 3), (3, 3, 4)], mutedStrings: [6], openStrings: [], barreFret: 1, barreStringRange: 1...5, focusNote: "食指7品横按1–5弦，中无名小指紧凑落位")
+            ]
+        case .basic:
+            let fChord: ChordSpec = (fChordStyle == .barre)
+                ? ChordSpec(name: "F", subtitle: "大横按", baseFretLabel: nil, dots: [(3, 2, 2), (5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "Am→F：中指稳落3弦2品，无名指落5弦3品")
+                : ChordSpec(name: "F", subtitle: "小横按", baseFretLabel: nil, dots: [(3, 2, 2), (4, 3, 3)], mutedStrings: [6, 5], openStrings: [], barreFret: 1, barreStringRange: 1...2, focusNote: "Am→F：食指横按1-2弦1品，中指3弦2品、无名指4弦3品")
+
+            return [
+                ChordSpec(name: "C", subtitle: "大三和弦", baseFretLabel: nil, dots: [(2, 1, 1), (4, 2, 2), (5, 3, 3)], mutedStrings: [6], openStrings: [1, 3], barreFret: nil, barreStringRange: nil, focusNote: "保持指尖立起，避免无名指碰到4弦"),
+                ChordSpec(name: "Am", subtitle: "小三和弦", baseFretLabel: nil, dots: [(2, 1, 1), (4, 2, 2), (3, 2, 3)], mutedStrings: [6], openStrings: [1, 5], barreFret: nil, barreStringRange: nil, focusNote: "准备切 F：中指与无名指即将分叉移动"),
+                fChord,
+                ChordSpec(name: "G", subtitle: "大三和弦", baseFretLabel: nil, dots: [(5, 2, 2), (6, 3, 3), (1, 3, 4)], mutedStrings: [], openStrings: [2, 3, 4], barreFret: nil, barreStringRange: nil, focusNote: "F→G：中指5弦2品、无名指6弦3品同步清晰落指")
             ]
         }
-
-        let fChord: ChordSpec = (fChordStyle == .barre)
-            ? ChordSpec(name: "F", subtitle: "大横按", dots: [(3, 2, 2), (5, 3, 3), (4, 3, 4)], mutedStrings: [], openStrings: [], barreFret: 1, barreStringRange: 1...6, focusNote: "Am→F：中指稳落3弦2品，无名指落5弦3品")
-            : ChordSpec(name: "F", subtitle: "小横按", dots: [(3, 2, 2), (4, 3, 3)], mutedStrings: [6, 5], openStrings: [], barreFret: 1, barreStringRange: 1...2, focusNote: "Am→F：食指横按1-2弦1品，中指3弦2品、无名指4弦3品")
-
-        return [
-            ChordSpec(name: "C", subtitle: "大三和弦", dots: [(2, 1, 1), (4, 2, 2), (5, 3, 3)], mutedStrings: [6], openStrings: [1, 3], barreFret: nil, barreStringRange: nil, focusNote: "保持指尖立起，避免无名指碰到4弦"),
-            ChordSpec(name: "Am", subtitle: "小三和弦", dots: [(2, 1, 1), (4, 2, 2), (3, 2, 3)], mutedStrings: [6], openStrings: [1, 5], barreFret: nil, barreStringRange: nil, focusNote: "准备切 F：中指与无名指即将分叉移动"),
-            fChord,
-            ChordSpec(name: "G", subtitle: "大三和弦", dots: [(5, 2, 2), (6, 3, 3), (1, 3, 4)], mutedStrings: [], openStrings: [2, 3, 4], barreFret: nil, barreStringRange: nil, focusNote: "F→G：中指5弦2品、无名指6弦3品同步清晰落指")
-        ]
     }
 
     private var currentChordIndex: Int {
@@ -584,7 +727,7 @@ private struct ChordTransitionVisualizer: View {
 
     private func chordDiagram(_ chord: ChordSpec) -> some View {
         GeometryReader { geo in
-            let leftPad: CGFloat = 12
+            let leftPad: CGFloat = 14
             let rightPad: CGFloat = 12
             let topPad: CGFloat = 20
             let bottomPad: CGFloat = 8
@@ -600,7 +743,14 @@ private struct ChordTransitionVisualizer: View {
                 Path { p in
                     p.move(to: CGPoint(x: leftPad, y: topPad))
                     p.addLine(to: CGPoint(x: leftPad + gridW, y: topPad))
-                }.stroke(Color.primary, lineWidth: 3)
+                }.stroke(Color.primary, lineWidth: chord.baseFretLabel == nil ? 3 : 1.5)
+
+                if let fretBadge = chord.baseFretLabel {
+                    Text(fretBadge)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(accentColor)
+                        .position(x: 6, y: yForFretCenter(1))
+                }
 
                 ForEach(1...4, id: \.self) { fret in
                     Path { p in
