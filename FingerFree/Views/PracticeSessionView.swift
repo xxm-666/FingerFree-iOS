@@ -5,8 +5,8 @@ struct PracticeSessionConfig: Identifiable {
     let exercises: [ExerciseItem]
     let title: String
 
-    static var classicTenMinuteMix: PracticeSessionConfig {
-        PracticeSessionConfig(exercises: ExerciseItem.classicDailyTenMinuteMix, title: "每日 10 分钟经典热身")
+    static func fullLevel(_ level: TrainingLevel) -> PracticeSessionConfig {
+        PracticeSessionConfig(exercises: level.exercises, title: "\(level.code) \(level.title) · 全套连练")
     }
 
     static func single(_ exercise: ExerciseItem) -> PracticeSessionConfig {

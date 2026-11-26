@@ -23,32 +23,13 @@ struct TodayPlanView: View {
             .navigationTitle("指律 · 进阶路径")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showPrinciplesSheet = true
                     } label: {
-                        Image(systemName: "book.closed.fill")
+                        Label("原则", systemImage: "book.closed.fill")
+                            .font(.subheadline.weight(.medium))
                     }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        activeSession = .classicTenMinuteMix
-                    } label: {
-                        Label("10分热身", systemImage: "bolt.fill")
-                            .font(.caption.bold())
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.orange],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                in: Capsule()
-                            )
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
                 }
             }
             .fullScreenCover(item: $activeSession) { config in
@@ -127,7 +108,8 @@ struct TodayPlanView: View {
 
     private var selectedLevelBanner: some View {
         let m = store.mastery(for: selectedLevel)
-        return VStack(alignment: .leading, spacing: 10) {
+        let totalMins = selectedLevel.exercises.reduce(0) { $0 + $1.durationMinutes }
+        return VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Label("\(selectedLevel.code) · \(selectedLevel.difficultyLabel)", systemImage: selectedLevel.symbolName)
                     .font(.caption.bold())
@@ -148,6 +130,29 @@ struct TodayPlanView: View {
                 .font(.caption)
                 .opacity(0.92)
                 .lineSpacing(3)
+
+            Button {
+                activeSession = .fullLevel(selectedLevel)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "play.fill")
+                        .font(.caption)
+                    Text("一键连练本阶段全部练习")
+                        .font(.subheadline.bold())
+                    Spacer()
+                    Text("\(selectedLevel.exercises.count) 项 · \(totalMins) 分钟")
+                        .font(.caption2.bold().monospacedDigit())
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.22), in: Capsule())
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
         .foregroundStyle(.white)
         .padding(18)
