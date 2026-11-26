@@ -11,14 +11,14 @@ struct LevelTestView: View {
     @State private var selectedTierIndex: Int = 0
     @State private var remainingSeconds: Int = 45
     @State private var isTesting: Bool = false
-    @State private var silentVisualMetronome: Bool = false
+    @State private var silentVisualMetronome: Bool = true
 
     // Lv.1 non-audio manual counters
     @State private var manualMistakes: Int = 0
     @State private var manualLinkages: Int = 0
 
     // Post-test 1-tap relaxation check & final result
-    @State private var noForearmTension: Bool = true
+    @State private var noForearmTension: Bool = false
     @State private var showPostCheck: Bool = false
     @State private var finalScore: Int? = nil
     @State private var finalRank: ProficiencyRank = .unranked
@@ -90,17 +90,6 @@ struct LevelTestView: View {
                 UIApplication.shared.isIdleTimerDisabled = false
                 stopEverything()
             }
-            .onChange(of: metronome.totalBeatCount) { _, newBeat in
-                guard isTesting && spec.usesAudioAnalysis && newBeat > 0 else { return }
-                let target = testExercise.expectedTargetNote(atBeat: newBeat)?.midi
-                audioEngine.onBeat(
-                    expectedMIDI: target,
-                    bpm: selectedTier.bpm,
-                    isChordMode: level.isChordAudioTest,
-                    isChordChangeBeat: ((newBeat - 1) % 4 == 0),
-                    metronomeSoundActive: !metronome.isMuted
-                )
-            }
             .onReceive(secondTimer) { _ in
                 guard isTesting && !metronome.isCountingIn else { return }
                 if remainingSeconds > 1 {
@@ -169,9 +158,9 @@ struct LevelTestView: View {
             if spec.usesAudioAnalysis {
                 Toggle(isOn: $silentVisualMetronome) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("静音节拍器（推荐耳机或纯视觉跟拍）")
+                        Text("静音视觉节拍器（推荐默认开启）")
                             .font(.caption.weight(.semibold))
-                        Text("关闭外放节拍声可彻底消除麦克风串音，音准识别最精准")
+                        Text("外放节拍声会被麦克风收录；如需听声跟拍，请佩戴耳机后关闭此项")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -257,23 +246,23 @@ struct LevelTestView: View {
 
             HStack(spacing: 10) {
                 telemetryBadge(
-                    title: level.isChordAudioTest ? "扫弦响应" : "识别音高",
+                    title: level.isChordAudioTest ? "和弦饱满" : "识别音高",
                     value: level.isChordAudioTest
-                        ? (audioEngine.inputLevel > 0.15 ? "已捕获 ✓" : "等待扫弦")
+                        ? (audioEngine.currentBeatPitchMatched ? "饱满 ✓" : (audioEngine.inputLevel > 0.15 ? "偏闷" : "等待扫弦"))
                         : "\(audioEngine.detectedNoteName)\(audioEngine.currentBeatPitchMatched ? " ✓" : "")",
-                    highlight: audioEngine.currentBeatPitchMatched || (level.isChordAudioTest && audioEngine.inputLevel > 0.15)
+                    highlight: audioEngine.currentBeatPitchMatched
                 )
 
                 telemetryBadge(
                     title: "节奏偏差",
                     value: timingBadgeText,
-                    highlight: (audioEngine.lastTimingOffsetMs.map { abs($0) <= 115 } ?? false)
+                    highlight: (audioEngine.lastTimingOffsetMs.map { abs($0) <= (level.isChordAudioTest ? 145 : 115) } ?? false)
                 )
 
                 telemetryBadge(
-                    title: "音色清晰",
+                    title: level.isChordAudioTest ? "频谱丰度" : "音色清晰",
                     value: "\(Int(audioEngine.detectedClarity * 100))%",
-                    highlight: audioEngine.detectedClarity >= 0.65
+                    highlight: audioEngine.detectedClarity >= (level.isChordAudioTest ? 0.55 : 0.65)
                 )
             }
         }
@@ -383,13 +372,13 @@ struct LevelTestView: View {
 
             if let summary = lastAudioSummary {
                 HStack(spacing: 10) {
-                    telemetryBadge(title: level.isChordAudioTest ? "换弦响应" : "音准命中", value: "\(Int(summary.pitchAccuracy * 100))%", highlight: summary.pitchAccuracy >= 0.75)
+                    telemetryBadge(title: level.isChordAudioTest ? "和弦饱满" : "音准命中", value: "\(Int(summary.pitchAccuracy * 100))%", highlight: summary.pitchAccuracy >= 0.75)
                     telemetryBadge(title: "节奏同步", value: "\(Int(summary.rhythmAccuracy * 100))%", highlight: summary.rhythmAccuracy >= 0.75)
-                    telemetryBadge(title: "音色清晰", value: "\(Int(summary.clarityScore * 100))%", highlight: summary.clarityScore >= 0.65)
+                    telemetryBadge(title: level.isChordAudioTest ? "频谱丰度" : "音色清晰", value: "\(Int(summary.clarityScore * 100))%", highlight: summary.clarityScore >= (level.isChordAudioTest ? 0.55 : 0.65))
                 }
             }
 
-            Toggle("刚才考核全程手背与前臂完全无酸胀感", isOn: $noForearmTension)
+            Toggle("确认刚才考核全程手背与前臂完全无酸胀感", isOn: $noForearmTension)
                 .font(.subheadline)
                 .tint(level.accentColor)
 
@@ -430,7 +419,7 @@ struct LevelTestView: View {
 
             if let summary = lastAudioSummary {
                 HStack(spacing: 10) {
-                    telemetryBadge(title: level.isChordAudioTest ? "扫弦响应" : "音准命中", value: "\(Int(summary.pitchAccuracy * 100))%", highlight: summary.pitchAccuracy >= 0.75)
+                    telemetryBadge(title: level.isChordAudioTest ? "和弦饱满" : "音准命中", value: "\(Int(summary.pitchAccuracy * 100))%", highlight: summary.pitchAccuracy >= 0.75)
                     telemetryBadge(title: "节奏同步", value: "\(Int(summary.rhythmAccuracy * 100))%", highlight: summary.rhythmAccuracy >= 0.75)
                     telemetryBadge(title: "平均偏差", value: "±\(summary.avgTimingOffsetMs)ms", highlight: summary.avgTimingOffsetMs <= 80)
                 }
@@ -482,6 +471,7 @@ struct LevelTestView: View {
         remainingSeconds = spec.durationSeconds
         manualMistakes = 0
         manualLinkages = 0
+        noForearmTension = false
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil
@@ -492,16 +482,41 @@ struct LevelTestView: View {
         metronome.countInEnabled = true
 
         if spec.usesAudioAnalysis {
+            let exercise = testExercise
+            let bpm = selectedTier.bpm
+            let chordMode = level.isChordAudioTest
+            let soundActive = !metronome.isMuted
+            let gateDuration = metronome.clickGateDuration
+            let engine = audioEngine
+
+            metronome.onBeatTick = { totalBeat, _, tickTime in
+                let target = exercise.expectedTargetNote(atBeat: totalBeat)?.midi
+                let nextTarget = exercise.expectedTargetNote(atBeat: totalBeat + 1)?.midi
+                engine.onBeat(
+                    expectedMIDI: target,
+                    nextExpectedMIDI: nextTarget,
+                    bpm: bpm,
+                    isChordMode: chordMode,
+                    isChordChangeBeat: ((totalBeat - 1) % 4 == 0),
+                    metronomeSoundActive: soundActive,
+                    clickGateDuration: gateDuration,
+                    tickTimestamp: tickTime
+                )
+            }
+
             audioEngine.resetMetrics()
             audioEngine.startListening()
+        } else {
+            metronome.onBeatTick = nil
         }
 
         isTesting = true
-        metronome.start(withCountIn: true)
+        metronome.start(withCountIn: true, resetProgress: true)
     }
 
     private func finishCaptureAndShowPostCheck() {
         isTesting = false
+        metronome.onBeatTick = nil
         metronome.stop()
         if spec.usesAudioAnalysis {
             lastAudioSummary = audioEngine.computeSummary()
@@ -517,11 +532,11 @@ struct LevelTestView: View {
 
         if spec.usesAudioAnalysis, let audio = lastAudioSummary {
             if level.isChordAudioTest {
-                // Chord stage: Onset rhythm sync 45% + clarity/sustain 40% + relaxation 15%, scaled by speed tier
-                let perf = (audio.rhythmAccuracy * 45.0) + (max(audio.clarityScore, audio.pitchAccuracy * 0.85) * 40.0)
+                // Chord stage: Onset rhythm sync 45% + chord fullness hit rate 25% + spectral richness 15% + relaxation 15%
+                let perf = (audio.rhythmAccuracy * 45.0) + (audio.pitchAccuracy * 25.0) + (audio.clarityScore * 15.0)
                 rawScore = perf * selectedTier.speedWeight + relaxPoints
             } else {
-                // Single-note stages (Lv.2–Lv.4): Pitch 40% + Rhythm 30% + Clarity 15% + Relaxation 15%
+                // Single-note stages (Lv.2–Lv.4, Lv.6): Pitch 40% + Rhythm 30% + Clarity 15% + Relaxation 15%
                 let perf = (audio.pitchAccuracy * 40.0) + (audio.rhythmAccuracy * 30.0) + (audio.clarityScore * 15.0)
                 rawScore = perf * selectedTier.speedWeight + relaxPoints
             }
@@ -546,6 +561,7 @@ struct LevelTestView: View {
         remainingSeconds = spec.durationSeconds
         manualMistakes = 0
         manualLinkages = 0
+        noForearmTension = false
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil
@@ -553,6 +569,7 @@ struct LevelTestView: View {
 
     private func stopEverything() {
         isTesting = false
+        metronome.onBeatTick = nil
         metronome.stop()
         audioEngine.stopListening()
     }

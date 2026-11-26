@@ -481,7 +481,7 @@ struct PracticeSessionView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: metronome.isRunning ? "pause.fill" : "play.fill")
-                    Text(metronome.isRunning ? "暂停节拍器（展开设置）" : "开始专注训练")
+                    Text(metronome.isRunning ? "暂停节拍器（展开设置）" : (metronome.totalBeatCount > 0 ? "继续专注训练" : "开始专注训练"))
                         .font(.headline)
                 }
                 .foregroundStyle(.white)

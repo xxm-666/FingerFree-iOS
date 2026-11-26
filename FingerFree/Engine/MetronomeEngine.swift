@@ -29,6 +29,19 @@ final class MetronomeEngine: ObservableObject {
     @Published var hapticsEnabled: Bool = true
     @Published var countInEnabled: Bool = true
 
+    /// Direct low-latency callback fired immediately on every non-count-in beat with its host timestamp.
+    var onBeatTick: ((_ totalBeatCount: Int, _ currentBeat: Int, _ tickTimestamp: CFAbsoluteTime) -> Void)?
+
+    /// Approximate audible decay duration of the currently selected metronome timbre (used for mic click-gating).
+    var clickGateDuration: Double {
+        switch sound {
+        case .classicMechanical: return 0.065
+        case .warmWoodblock: return 0.095
+        case .guitarBodyTap: return 0.120
+        case .softMarimba: return 0.165
+        }
+    }
+
     private let audioEngine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private var accentBuffers: [MetronomeSound: AVAudioPCMBuffer] = [:]
@@ -263,7 +276,7 @@ final class MetronomeEngine: ObservableObject {
         }
     }
 
-    func start(withCountIn: Bool? = nil) {
+    func start(withCountIn: Bool? = nil, resetProgress: Bool = true) {
         guard !isRunning else { return }
         if !audioEngine.isRunning && audioConfigured {
             try? audioEngine.start()
@@ -275,9 +288,21 @@ final class MetronomeEngine: ObservableObject {
         isRunning = true
         isCountingIn = useCountIn
         countInBeat = 0
-        currentBeat = 0
-        totalBeatCount = 0
+        if resetProgress {
+            currentBeat = 0
+            totalBeatCount = 0
+        }
         scheduleTimer(fireImmediately: true)
+    }
+
+    /// Pauses playback while preserving `totalBeatCount` and `currentBeat` so visualizers resume seamlessly.
+    func pause() {
+        timer?.cancel()
+        timer = nil
+        playerNode.stop()
+        isRunning = false
+        isCountingIn = false
+        countInBeat = 0
     }
 
     func stop() {
@@ -288,13 +313,15 @@ final class MetronomeEngine: ObservableObject {
         isCountingIn = false
         countInBeat = 0
         currentBeat = 0
+        totalBeatCount = 0
     }
 
     func toggle() {
         if isRunning {
-            stop()
+            pause()
         } else {
-            start()
+            let hasProgress = totalBeatCount > 0
+            start(resetProgress: !hasProgress)
         }
     }
 
@@ -340,12 +367,14 @@ final class MetronomeEngine: ObservableObject {
         }
 
         let nextBeat = (currentBeat % 4) + 1
-        lastTickTimestamp = CFAbsoluteTimeGetCurrent()
+        let tickTime = CFAbsoluteTimeGetCurrent()
+        lastTickTimestamp = tickTime
         currentBeat = nextBeat
         totalBeatCount += 1
 
         let isAccent = (nextBeat == 1)
         playClick(accent: isAccent)
+        onBeatTick?(totalBeatCount, nextBeat, tickTime)
 
         if hapticsEnabled {
             if isAccent {

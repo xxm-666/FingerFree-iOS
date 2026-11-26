@@ -129,16 +129,16 @@ enum TrainingLevel: Int, CaseIterable, Identifiable, Codable {
         case .lv4:
             return LevelTestSpec(
                 level: .lv4,
-                title: "Lv.4 跨度与圆滑音实时音频考核",
-                durationSeconds: 40,
+                title: "Lv.4 隔品扩张实时音频考核",
+                durationSeconds: 48,
                 usesAudioAnalysis: true,
-                testExerciseId: "lv4_trill",
+                testExerciseId: "lv4_wide",
                 tiers: [
                     TestSpeedTier(name: "达标", bpm: 55, speedWeight: 0.85),
                     TestSpeedTier(name: "进阶", bpm: 70, speedWeight: 0.95),
                     TestSpeedTier(name: "大师", bpm: 85, speedWeight: 1.00)
                 ],
-                requirement: "食指 3 弦 5 品与中指 3 弦 6 品固定，仅用无名指(7品)与小指(8品)纯左手打勾弦发声，麦克风实时检测 D4/D#4 交替清晰度。"
+                requirement: "按 5-6-8-9 隔品扩张把位从 6 弦爬至 1 弦再折返，麦克风实时检测大跨度按弦的音准、节拍同步与无打品清晰度。"
             )
         case .lv5:
             return LevelTestSpec(
