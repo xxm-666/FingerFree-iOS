@@ -177,10 +177,10 @@ final class PracticeStore: ObservableObject {
 
     static let unlockScoreThreshold = 65 // B 级解锁门槛
 
-    /// Returns whether the user has unlocked `level` (Lv.1 & Lv.2 always unlocked; Lv.3–5 unlock sequentially at B rank >= 65% or via jump-test; Chords unlocks at Lv.2 B rank or via jump-test).
+    /// Returns whether the user has unlocked `level` (Lv.1, Lv.2, and Chord Lab drill #1 are always unlocked; Lv.3–5 and Chord drills #2–6 unlock sequentially at B rank >= 65% or via jump-test).
     func isUnlocked(_ level: TrainingLevel) -> Bool {
         let threshold = Self.unlockScoreThreshold
-        if level == .lv1 || level == .lv2 { return true }
+        if level == .lv1 || level == .lv2 || level == .chords { return true }
         if mastery(for: level).bestScore >= threshold { return true }
 
         let mainTrack = TrainingLevel.mainTrackLevels
@@ -192,10 +192,8 @@ final class PracticeStore: ObservableObject {
             // Standard sequential unlock: previous main-track stage >= B rank
             let prev = mainTrack[idx - 1]
             return mastery(for: prev).bestScore >= threshold
-        } else {
-            // Chord Lab unlocks once Lv.2 (or any higher main-track stage) reaches B rank
-            return [TrainingLevel.lv2, .lv3, .lv4, .lv5].contains { mastery(for: $0).bestScore >= threshold }
         }
+        return true
     }
 
     func lockReason(for level: TrainingLevel) -> String? {
