@@ -167,10 +167,10 @@ final class PracticeStore: ObservableObject {
 
     static let unlockScoreThreshold = 65 // B 级解锁门槛
 
-    /// Returns whether the user has unlocked `level` (Lv.1 always unlocked; Lv.2–5 unlock sequentially at B rank >= 65% or via jump-test; Chords unlocks at Lv.2 B rank or via jump-test).
+    /// Returns whether the user has unlocked `level` (Lv.1 & Lv.2 always unlocked; Lv.3–5 unlock sequentially at B rank >= 65% or via jump-test; Chords unlocks at Lv.2 B rank or via jump-test).
     func isUnlocked(_ level: TrainingLevel) -> Bool {
         let threshold = Self.unlockScoreThreshold
-        if level == .lv1 { return true }
+        if level == .lv1 || level == .lv2 { return true }
         if mastery(for: level).bestScore >= threshold { return true }
 
         let mainTrack = TrainingLevel.mainTrackLevels
