@@ -51,7 +51,11 @@ struct ProgressAndGuideView: View {
 
     private var statsBentoRow: some View {
         HStack(spacing: 10) {
-            statTile(value: "\(store.overallMasteryPercent)%", title: "综合熟练度", color: .cyan)
+            statTile(
+                value: store.testedLevelCount > 0 ? "\(store.overallMasteryPercent)%" : "--",
+                title: "已测均分 (\(store.testedLevelCount)/\(TrainingLevel.allCases.count))",
+                color: .cyan
+            )
             statTile(value: "\(store.currentStreakDays)天", title: "连续打卡", color: .orange)
             statTile(value: "\(store.totalPracticeMinutes)分", title: "累计时长", color: .green)
         }
@@ -71,7 +75,7 @@ struct ProgressAndGuideView: View {
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - 5-Axis Skill Radar Chart
+    // MARK: - 6-Axis Skill Radar Chart
 
     private var radarCard: some View {
         let values = TrainingLevel.allCases.map { Double(store.mastery(for: $0).bestScore) / 100.0 }
@@ -100,6 +104,13 @@ struct ProgressAndGuideView: View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(TrainingLevel.allCases) { level in
                 let m = store.mastery(for: level)
+                let detailText: String = {
+                    if m.bestScore == 0 { return "未考核 · 点击测试" }
+                    if m.lastScore != m.bestScore {
+                        return "最高 \(m.bestScore)% · 最近 \(m.lastScore)%"
+                    }
+                    return "熟练度 \(m.bestScore)% · 点击复测"
+                }()
                 Button {
                     retestLevel = level
                 } label: {
@@ -124,9 +135,10 @@ struct ProgressAndGuideView: View {
                         }
                         .frame(height: 6)
 
-                        Text(m.bestScore > 0 ? "熟练度 \(m.bestScore)% · 点击复测" : "未考核 · 点击测试")
+                        Text(detailText)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     .padding(12)
                     .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))

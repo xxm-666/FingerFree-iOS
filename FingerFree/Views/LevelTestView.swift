@@ -23,6 +23,7 @@ struct LevelTestView: View {
     @State private var finalScore: Int? = nil
     @State private var finalRank: ProficiencyRank = .unranked
     @State private var lastAudioSummary: AudioTestMetrics? = nil
+    @State private var appliedTestSpeedAdjustment: Bool = false
 
     private let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -133,21 +134,29 @@ struct LevelTestView: View {
 
     private var tierSelectionCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("选择挑战速度档位")
-                .font(.subheadline.bold())
+            HStack {
+                Text("选择挑战速度档位")
+                    .font(.subheadline.bold())
+                Spacer()
+                Text("当前练习 \(store.bpm(for: testExercise)) BPM")
+                    .font(.caption.bold().monospacedDigit())
+                    .foregroundStyle(level.accentColor)
+            }
 
             HStack(spacing: 8) {
                 ForEach(Array(spec.tiers.enumerated()), id: \.element.id) { idx, tier in
                     let selected = idx == selectedTierIndex
+                    let maxRankHint = tier.speedWeight < 0.90 ? "最高 A" : (tier.speedWeight < 1.0 ? "可冲 S" : "满分 100")
                     Button {
                         selectedTierIndex = idx
                     } label: {
-                        VStack(spacing: 3) {
+                        VStack(spacing: 2) {
                             Text(tier.name).font(.subheadline.bold())
-                            Text("\(tier.bpm) BPM").font(.caption.monospacedDigit()).opacity(0.85)
+                            Text("\(tier.bpm) BPM").font(.caption.monospacedDigit()).opacity(0.9)
+                            Text(maxRankHint).font(.system(size: 10)).opacity(0.75)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 9)
                         .background(selected ? level.accentColor : Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
                         .foregroundStyle(selected ? .white : .primary)
                     }
@@ -432,6 +441,46 @@ struct LevelTestView: View {
                 .frame(maxWidth: .infinity)
                 .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
 
+            if rank == .s {
+                if !appliedTestSpeedAdjustment {
+                    Button {
+                        store.speedUp(exercises: level.exercises, by: 5)
+                        appliedTestSpeedAdjustment = true
+                    } label: {
+                        Label("一键将 \(level.code) 全部练习目标 +5 BPM", systemImage: "arrow.up.circle.fill")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Color.green, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Label("已将 \(level.code) 全部练习目标提速 +5 BPM", systemImage: "checkmark.circle.fill")
+                        .font(.caption.bold())
+                        .foregroundStyle(.green)
+                }
+            } else if rank == .c {
+                if !appliedTestSpeedAdjustment {
+                    Button {
+                        store.speedUp(exercises: level.exercises, by: -10)
+                        appliedTestSpeedAdjustment = true
+                    } label: {
+                        Label("一键将 \(level.code) 练习目标降速 -10 BPM", systemImage: "arrow.down.circle.fill")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Color.orange, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Label("已将 \(level.code) 练习目标下调 -10 BPM", systemImage: "checkmark.circle.fill")
+                        .font(.caption.bold())
+                        .foregroundStyle(.orange)
+                }
+            }
+
             HStack(spacing: 12) {
                 Button {
                     resetTestState()
@@ -472,6 +521,7 @@ struct LevelTestView: View {
         manualMistakes = 0
         manualLinkages = 0
         noForearmTension = false
+        appliedTestSpeedAdjustment = false
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil
@@ -541,11 +591,11 @@ struct LevelTestView: View {
                 rawScore = perf * selectedTier.speedWeight + relaxPoints
             }
         } else {
-            // Lv.1 Wakeup (no audio): Speed tier 35% + Mistake-free 30% + Zero-linkage 20% + Relaxation 15%
-            let speedPts = 35.0 * selectedTier.speedWeight
+            // Lv.1 Wakeup (no audio): Unified scale — Base 35% + Mistake-free 30% + Zero-linkage 20% = 85% * speedWeight + Relaxation 15%
             let mistakePts = max(0.0, 30.0 - Double(manualMistakes) * 6.0)
             let linkagePts = max(0.0, 20.0 - Double(manualLinkages) * 7.0)
-            rawScore = speedPts + mistakePts + linkagePts + relaxPoints
+            let perf = 35.0 + mistakePts + linkagePts
+            rawScore = perf * selectedTier.speedWeight + relaxPoints
         }
 
         let clamped = min(100, max(0, Int(rawScore.rounded())))
@@ -562,6 +612,7 @@ struct LevelTestView: View {
         manualMistakes = 0
         manualLinkages = 0
         noForearmTension = false
+        appliedTestSpeedAdjustment = false
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil

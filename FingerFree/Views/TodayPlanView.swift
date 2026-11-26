@@ -11,8 +11,12 @@ struct TodayPlanView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    dailyRecommendationCard
                     levelStepperRow
                     selectedLevelBanner
+                    if let warning = store.prerequisiteWarning(for: selectedLevel) {
+                        prerequisiteWarningBanner(text: warning)
+                    }
                     exercisesListSection
                     stageTestCTACard
                 }
@@ -47,7 +51,86 @@ struct TodayPlanView: View {
         }
     }
 
-    // MARK: - Horizontal 5-Level Stepper (Easy -> Hard)
+    // MARK: - Daily Recommendation Card
+
+    private var dailyRecommendationCard: some View {
+        let rec = store.dailyRecommendation
+        return Button {
+            selectedLevel = rec.level
+            if rec.shouldTakeTest {
+                activeTestLevel = rec.level
+            } else {
+                activeSession = .single(rec.exercise)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(rec.level.accentColor.opacity(0.16))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: rec.shouldTakeTest ? "trophy.fill" : "sparkles")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(rec.level.accentColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("今日推荐")
+                            .font(.caption2.bold())
+                            .foregroundStyle(rec.level.accentColor)
+                        if store.practicedToday {
+                            Text("今日已打卡 ✓")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    Text(rec.headline)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(rec.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                Text(rec.shouldTakeTest ? "去考核" : "去练")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(rec.level.accentColor, in: Capsule())
+                    .foregroundStyle(.white)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(rec.level.accentColor.opacity(0.28), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func prerequisiteWarningBanner(text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .padding(.top, 1)
+            Text(text)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineSpacing(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    // MARK: - Horizontal 6-Level Stepper (Easy -> Hard)
 
     private var levelStepperRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -109,6 +192,13 @@ struct TodayPlanView: View {
     private var selectedLevelBanner: some View {
         let m = store.mastery(for: selectedLevel)
         let totalMins = selectedLevel.exercises.reduce(0) { $0 + $1.durationMinutes }
+        let masteryLabel: String = {
+            if m.bestScore == 0 { return "尚未考核" }
+            if m.lastScore != m.bestScore {
+                return "最高 \(m.bestScore)% · 最近 \(m.lastScore)%"
+            }
+            return "熟练度 \(m.bestScore)% (\(m.bestRank.rawValue))"
+        }()
         return VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Label("\(selectedLevel.code) · \(selectedLevel.difficultyLabel)", systemImage: selectedLevel.symbolName)
@@ -119,7 +209,7 @@ struct TodayPlanView: View {
 
                 Spacer()
 
-                Text(m.bestScore > 0 ? "熟练度 \(m.bestScore)% (\(m.bestRank.rawValue))" : "尚未考核")
+                Text(masteryLabel)
                     .font(.caption.bold().monospacedDigit())
             }
 

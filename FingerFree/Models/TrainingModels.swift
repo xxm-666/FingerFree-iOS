@@ -828,8 +828,8 @@ enum ProficiencyRank: String, Codable {
 
     var advice: String {
         switch self {
-        case .s: return "神经控制极其稳固！已解锁下一阶段，并可直接提速 +5 BPM。"
-        case .a: return "已达标并解锁下一阶段！建议日常练习时继续保持。"
+        case .s: return "神经控制极其稳固！已达到本阶段大师水准，可直接提速 +5 BPM 并推进下一阶段。"
+        case .a: return "本阶段已稳固达标！日常继续保持放松，随时可以挑战下一阶段。"
         case .b: return "基本成型，但仍有轻微失误或联动，建议在当前速度巩固 2–3 天后再复测。"
         case .c: return "检测到较明显失误或紧绷，建议立刻下调 10 BPM 重建清晰神经通路。"
         case .unranked: return "尚未完成本阶段考核。"
@@ -840,9 +840,42 @@ enum ProficiencyRank: String, Codable {
 struct LevelMastery: Codable {
     var bestScore: Int
     var bestRank: ProficiencyRank
+    var lastScore: Int
+    var lastRank: ProficiencyRank
     var lastTestedDate: Date?
 
-    static let empty = LevelMastery(bestScore: 0, bestRank: .unranked, lastTestedDate: nil)
+    static let empty = LevelMastery(
+        bestScore: 0,
+        bestRank: .unranked,
+        lastScore: 0,
+        lastRank: .unranked,
+        lastTestedDate: nil
+    )
+
+    init(
+        bestScore: Int,
+        bestRank: ProficiencyRank,
+        lastScore: Int,
+        lastRank: ProficiencyRank,
+        lastTestedDate: Date?
+    ) {
+        self.bestScore = bestScore
+        self.bestRank = bestRank
+        self.lastScore = lastScore
+        self.lastRank = lastRank
+        self.lastTestedDate = lastTestedDate
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let best = try c.decodeIfPresent(Int.self, forKey: .bestScore) ?? 0
+        let bRank = try c.decodeIfPresent(ProficiencyRank.self, forKey: .bestRank) ?? .unranked
+        self.bestScore = best
+        self.bestRank = bRank
+        self.lastScore = try c.decodeIfPresent(Int.self, forKey: .lastScore) ?? best
+        self.lastRank = try c.decodeIfPresent(ProficiencyRank.self, forKey: .lastRank) ?? bRank
+        self.lastTestedDate = try c.decodeIfPresent(Date.self, forKey: .lastTestedDate)
+    }
 }
 
 // MARK: - Metronome Timbres & Preferences
