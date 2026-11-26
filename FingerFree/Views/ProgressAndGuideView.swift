@@ -2,12 +2,13 @@ import SwiftUI
 
 struct ProgressAndGuideView: View {
     @EnvironmentObject private var store: PracticeStore
-    @State private var selectedSection: DashboardTab = .settings
+    @State private var selectedSection: ProfileSection = .radar
     @State private var isHistoryExpanded: Bool = false
+    @State private var retestLevel: TrainingLevel?
 
-    private enum DashboardTab: String, CaseIterable, Identifiable {
-        case settings = "速度与偏好"
-        case principles = "进阶原则"
+    private enum ProfileSection: String, CaseIterable, Identifiable {
+        case radar = "能力雷达"
+        case settings = "偏好与原则"
         var id: String { rawValue }
     }
 
@@ -18,26 +19,31 @@ struct ProgressAndGuideView: View {
                     statsBentoRow
 
                     Picker("视图切换", selection: $selectedSection) {
-                        ForEach(DashboardTab.allCases) { tab in
-                            Text(tab.rawValue).tag(tab)
+                        ForEach(ProfileSection.allCases) { sec in
+                            Text(sec.rawValue).tag(sec)
                         }
                     }
                     .pickerStyle(.segmented)
 
-                    if selectedSection == .settings {
-                        bpmGridCard
-                        preferencesCard
+                    if selectedSection == .radar {
+                        radarCard
+                        masteryGrid
                         collapsibleHistoryCard
                     } else {
+                        preferencesCard
                         principlesListCard
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("进度与设置")
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("能力画像")
             .navigationBarTitleDisplayMode(.inline)
+            .fullScreenCover(item: $retestLevel) { lv in
+                LevelTestView(level: lv)
+                    .environmentObject(store)
+            }
         }
     }
 
@@ -45,84 +51,145 @@ struct ProgressAndGuideView: View {
 
     private var statsBentoRow: some View {
         HStack(spacing: 10) {
-            statTile(value: "\(store.currentStreakDays)", unit: "天", title: "连续打卡", color: .orange)
-            statTile(value: "\(store.records.count)", unit: "次", title: "累计训练", color: .blue)
-            statTile(value: "\(store.totalPracticeMinutes)", unit: "分", title: "累计时长", color: .green)
+            statTile(value: "\(store.overallMasteryPercent)%", title: "综合熟练度", color: .cyan)
+            statTile(value: "\(store.currentStreakDays)天", title: "连续打卡", color: .orange)
+            statTile(value: "\(store.totalPracticeMinutes)分", title: "累计时长", color: .green)
         }
     }
 
-    private func statTile(value: String, unit: String, title: String, color: Color) -> some View {
+    private func statTile(value: String, title: String, color: Color) -> some View {
         VStack(spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(.title2.bold().monospacedDigit())
-                    .foregroundStyle(color)
-                Text(unit)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(value)
+                .font(.title3.bold().monospacedDigit())
+                .foregroundStyle(color)
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - 2x2 BPM Grid
+    // MARK: - 5-Axis Skill Radar Chart
 
-    private var bpmGridCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private var radarCard: some View {
+        let values = TrainingLevel.allCases.map { Double(store.mastery(for: $0).bestScore) / 100.0 }
+        let labels = TrainingLevel.allCases.map { $0.title }
+
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("各阶段目标速度")
+                Text("五维左手独立性雷达")
                     .font(.subheadline.bold())
                 Spacer()
-                Text("稳定 2 分钟无酸胀再 +5")
+                Text("基于各阶段考核实时更新")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(TrainingStageKind.allCases) { stage in
-                    VStack(alignment: .leading, spacing: 8) {
+            SkillRadarView(values: values, labels: labels)
+                .frame(height: 215)
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    // MARK: - Per-Level Mastery Compact Grid
+
+    private var masteryGrid: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            ForEach(TrainingLevel.allCases) { level in
+                let m = store.mastery(for: level)
+                Button {
+                    retestLevel = level
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("0\(stage.index) \(stage.phaseTitle)")
+                            Text("\(level.code) \(level.title)")
                                 .font(.caption.bold())
-                                .foregroundStyle(stage.accentColor)
+                                .foregroundStyle(level.accentColor)
                             Spacer()
-                            Text("\(store.bpm(for: stage))")
-                                .font(.headline.bold().monospacedDigit())
+                            Text(m.bestRank.rawValue)
+                                .font(.caption.bold())
+                                .foregroundStyle(.primary)
                         }
 
-                        HStack(spacing: 8) {
-                            miniStepButton(label: "-5") {
-                                store.setBPM(store.bpm(for: stage) - 5, for: stage)
-                            }
-                            miniStepButton(label: "+5") {
-                                store.setBPM(store.bpm(for: stage) + 5, for: stage)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.primary.opacity(0.1))
+                                Capsule()
+                                    .fill(level.accentColor)
+                                    .frame(width: max(4, geo.size.width * CGFloat(m.bestScore) / 100.0))
                             }
                         }
+                        .frame(height: 6)
+
+                        Text(m.bestScore > 0 ? "熟练度 \(m.bestScore)% · 点击复测" : "未考核 · 点击测试")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(12)
                     .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    private func miniStepButton(label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.caption.bold().monospacedDigit())
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    // MARK: - Collapsible Training & Test History (Collapsed by Default)
+
+    private var collapsibleHistoryCard: some View {
+        DisclosureGroup(isExpanded: $isHistoryExpanded) {
+            VStack(spacing: 10) {
+                if store.records.isEmpty {
+                    Text("还没有训练或考核记录，去完成今天第一个练习吧！")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                } else {
+                    ForEach(store.records.prefix(20)) { record in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(record.title)
+                                    .font(.caption.weight(.semibold))
+                                Text("\(record.date.formatted(date: .abbreviated, time: .shortened)) · \(max(1, record.durationSeconds / 60)) 分钟")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(record.badgeText)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    (record.isTest ? Color.purple : Color.blue).opacity(0.14),
+                                    in: Capsule()
+                                )
+                                .foregroundStyle(record.isTest ? .purple : .blue)
+                        }
+                        .padding(.top, 6)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(.blue)
+                Text("训练与考核记录")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("共 \(store.records.count) 次")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    // MARK: - Compact Preferences Card
+    // MARK: - Preferences & Principles
 
     private var preferencesCard: some View {
         VStack(spacing: 0) {
@@ -136,17 +203,7 @@ struct ProgressAndGuideView: View {
             }
             Divider().padding(.leading, 14)
 
-            preferenceRow(title: "第 2 阶段爬格子") {
-                Picker("爬格子指型", selection: $store.spiderPattern) {
-                    ForEach(SpiderPattern.allCases) { pattern in
-                        Text(pattern.rawValue).tag(pattern)
-                    }
-                }
-                .labelsHidden()
-            }
-            Divider().padding(.leading, 14)
-
-            preferenceRow(title: "第 4 阶段 F 和弦") {
+            preferenceRow(title: "Lv.5 F 和弦指法") {
                 Picker("F 和弦指法", selection: $store.fChordStyle) {
                     ForEach(FChordStyle.allCases) { style in
                         Text(style.rawValue).tag(style)
@@ -172,8 +229,7 @@ struct ProgressAndGuideView: View {
 
     private func preferenceRow<Control: View>(title: String, @ViewBuilder control: () -> Control) -> some View {
         HStack {
-            Text(title)
-                .font(.subheadline)
+            Text(title).font(.subheadline)
             Spacer()
             control()
         }
@@ -181,62 +237,8 @@ struct ProgressAndGuideView: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: - Collapsible Training History (Collapsed by Default)
-
-    private var collapsibleHistoryCard: some View {
-        DisclosureGroup(isExpanded: $isHistoryExpanded) {
-            VStack(spacing: 10) {
-                if store.records.isEmpty {
-                    Text("还没有打卡记录，去完成今天第一个 10 分钟吧！")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 8)
-                } else {
-                    ForEach(store.records.prefix(15)) { record in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(record.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption.weight(.semibold))
-                                Text("完成 \(record.completedStages.count) 个阶段 · \(max(1, record.durationSeconds / 60)) 分钟")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if record.qualifiesForSpeedUp {
-                                Text("可提速 +5")
-                                    .font(.caption2.bold())
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(Color.green.opacity(0.16), in: Capsule())
-                                    .foregroundStyle(.green)
-                            }
-                        }
-                        .padding(.top, 6)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .foregroundStyle(.blue)
-                Text("训练打卡记录")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text("共 \(store.records.count) 次")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(14)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    // MARK: - Principles Tab
-
     private var principlesListCard: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             ForEach(PracticePrinciple.all) { item in
                 VStack(alignment: .leading, spacing: 6) {
                     Label(item.title, systemImage: item.icon)
@@ -249,8 +251,83 @@ struct ProgressAndGuideView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
+        }
+    }
+}
+
+// MARK: - Native SwiftUI 5-Axis Radar Chart
+private struct SkillRadarView: View {
+    let values: [Double] // 5 values in 0...1
+    let labels: [String]
+
+    var body: some View {
+        GeometryReader { geo in
+            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2 + 4)
+            let radius = min(geo.size.width, geo.size.height) * 0.34
+            let count = max(values.count, 5)
+
+            ZStack {
+                // Concentric pentagon grids
+                ForEach([0.33, 0.66, 1.0], id: \.self) { scale in
+                    polygonPath(center: center, radius: radius * scale, values: Array(repeating: 1.0, count: count))
+                        .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                }
+
+                // Spokes
+                ForEach(0..<count, id: \.self) { i in
+                    Path { p in
+                        p.move(to: center)
+                        p.addLine(to: point(center: center, radius: radius, index: i, total: count))
+                    }
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                }
+
+                // Filled data polygon
+                let safeValues = values.map { max(0.10, min(1.0, $0)) }
+                polygonPath(center: center, radius: radius, values: safeValues)
+                    .fill(Color.cyan.opacity(0.28))
+                polygonPath(center: center, radius: radius, values: safeValues)
+                    .stroke(Color.cyan, lineWidth: 2)
+
+                // Vertex dots & axis labels
+                ForEach(0..<count, id: \.self) { i in
+                    let dotPt = point(center: center, radius: radius * safeValues[i], index: i, total: count)
+                    Circle()
+                        .fill(Color.cyan)
+                        .frame(width: 7, height: 7)
+                        .position(dotPt)
+
+                    let labelPt = point(center: center, radius: radius + 24, index: i, total: count)
+                    Text(labels[i])
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .position(labelPt)
+                }
+            }
+        }
+    }
+
+    private func point(center: CGPoint, radius: CGFloat, index: Int, total: Int) -> CGPoint {
+        let angle = (-Double.pi / 2.0) + (Double(index) * 2.0 * Double.pi / Double(total))
+        return CGPoint(
+            x: center.x + CGFloat(cos(angle)) * radius,
+            y: center.y + CGFloat(sin(angle)) * radius
+        )
+    }
+
+    private func polygonPath(center: CGPoint, radius: CGFloat, values: [Double]) -> Path {
+        Path { path in
+            for i in 0..<values.count {
+                let pt = point(center: center, radius: radius * values[i], index: i, total: values.count)
+                if i == 0 {
+                    path.move(to: pt)
+                } else {
+                    path.addLine(to: pt)
+                }
+            }
+            path.closeSubpath()
         }
     }
 }

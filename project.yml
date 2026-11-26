@@ -9,8 +9,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.2.0"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "5"
     PRODUCT_NAME: FingerFree
     TARGETED_DEVICE_FAMILY: "1,2"
     SUPPORTS_MACCATALYST: NO
@@ -29,6 +29,7 @@ targets:
         CFBundleDisplayName: 指律
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSMicrophoneUsageDescription: "指律需要使用麦克风在持琴考核阶段实时分析你的吉他音准、节奏同步与音色清晰度，音频仅在本地实时处理，不会录音或上传。"
         UILaunchScreen:
           UIColorName: ""
         UIRequiredDeviceCapabilities:

@@ -2,50 +2,61 @@ import SwiftUI
 
 struct TodayPlanView: View {
     @EnvironmentObject private var store: PracticeStore
+    @State private var selectedLevel: TrainingLevel = .lv1
     @State private var activeSession: PracticeSessionConfig?
-    @State private var selectedStage: TrainingStageKind = .neuralWakeup
+    @State private var activeTestLevel: TrainingLevel?
     @State private var showPrinciplesSheet: Bool = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                heroCard
-                    .padding(.horizontal, 16)
-
-                stageSelectorBar
-                    .padding(.horizontal, 16)
-
-                // Horizontal paged carousel instead of a long vertical list
-                TabView(selection: $selectedStage) {
-                    ForEach(TrainingStageKind.allCases) { stage in
-                        stageCarouselCard(stage)
-                            .padding(.horizontal, 16)
-                            .tag(stage)
-                    }
+            ScrollView {
+                VStack(spacing: 16) {
+                    levelStepperRow
+                    selectedLevelBanner
+                    exercisesListSection
+                    stageTestCTACard
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(maxHeight: .infinity)
-
-                principlesCompactBar
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.top, 8)
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("指律")
+            .navigationTitle("指律 · 进阶路径")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showPrinciplesSheet = true
                     } label: {
-                        Label("原则", systemImage: "book.closed.fill")
-                            .font(.subheadline.weight(.medium))
+                        Image(systemName: "book.closed.fill")
                     }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        activeSession = .classicTenMinuteMix
+                    } label: {
+                        Label("10分热身", systemImage: "bolt.fill")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.orange],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                in: Capsule()
+                            )
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .fullScreenCover(item: $activeSession) { config in
                 PracticeSessionView(config: config)
+                    .environmentObject(store)
+            }
+            .fullScreenCover(item: $activeTestLevel) { level in
+                LevelTestView(level: level)
                     .environmentObject(store)
             }
             .sheet(isPresented: $showPrinciplesSheet) {
@@ -55,220 +66,202 @@ struct TodayPlanView: View {
         }
     }
 
-    // MARK: - Hero Card
+    // MARK: - Horizontal 5-Level Stepper (Easy -> Hard)
 
-    private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var levelStepperRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(TrainingLevel.allCases) { level in
+                    let isSelected = (level == selectedLevel)
+                    let m = store.mastery(for: level)
+
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                            selectedLevel = level
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(level.code)
+                                    .font(.caption2.bold())
+                                Spacer()
+                                Text("\(m.bestScore)%")
+                                    .font(.caption2.bold().monospacedDigit())
+                            }
+                            .opacity(isSelected ? 0.95 : 0.72)
+
+                            Text(level.title)
+                                .font(.caption.bold())
+                                .lineLimit(1)
+
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule()
+                                        .fill(isSelected ? Color.white.opacity(0.28) : Color.primary.opacity(0.1))
+                                    Capsule()
+                                        .fill(isSelected ? Color.white : level.accentColor)
+                                        .frame(width: max(4, geo.size.width * CGFloat(m.bestScore) / 100.0))
+                                }
+                            }
+                            .frame(height: 4)
+                        }
+                        .padding(11)
+                        .frame(width: 96)
+                        .background(
+                            isSelected ? level.accentColor : Color(.secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .foregroundStyle(isSelected ? .white : .primary)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(isSelected ? level.accentColor : Color.primary.opacity(0.06), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: - Selected Level Banner
+
+    private var selectedLevelBanner: some View {
+        let m = store.mastery(for: selectedLevel)
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("黄金热身 · 练琴前 10 分钟", systemImage: "sunrise.fill")
-                    .font(.caption.weight(.semibold))
+                Label("\(selectedLevel.code) · \(selectedLevel.difficultyLabel)", systemImage: selectedLevel.symbolName)
+                    .font(.caption.bold())
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.white.opacity(0.18), in: Capsule())
+                    .padding(.vertical, 4)
+                    .background(.white.opacity(0.2), in: Capsule())
 
                 Spacer()
 
-                if store.practicedToday {
-                    Label("今日已打卡", systemImage: "checkmark.circle.fill")
-                        .font(.caption.bold())
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.green.opacity(0.32), in: Capsule())
-                } else {
-                    Text("连续 \(store.currentStreakDays) 天")
-                        .font(.caption.weight(.semibold))
-                        .opacity(0.9)
-                }
+                Text(m.bestScore > 0 ? "熟练度 \(m.bestScore)% (\(m.bestRank.rawValue))" : "尚未考核")
+                    .font(.caption.bold().monospacedDigit())
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("打破中指与无名指联动")
-                    .font(.title3.bold())
-                Text("4 阶段渐进训练 · \(store.metronomeSound.displayName)节拍器")
-                    .font(.caption)
-                    .opacity(0.86)
-            }
+            Text("\(selectedLevel.title)阶段")
+                .font(.title3.bold())
 
-            Button {
-                activeSession = .fullTenMinutePlan
-            } label: {
-                HStack {
-                    Image(systemName: "play.fill")
-                    Text("开始今日 10 分钟完整训练")
-                        .font(.subheadline.bold())
-                    Spacer()
-                    Text("10 MIN")
-                        .font(.caption2.bold().monospacedDigit())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.black.opacity(0.22), in: Capsule())
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
+            Text(selectedLevel.summary)
+                .font(.caption)
+                .opacity(0.92)
+                .lineSpacing(3)
         }
         .foregroundStyle(.white)
         .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
-                colors: [
-                    Color(red: 0.14, green: 0.19, blue: 0.36),
-                    Color(red: 0.32, green: 0.22, blue: 0.38),
-                    Color(red: 0.72, green: 0.35, blue: 0.22)
-                ],
+                colors: [selectedLevel.accentColor, Color(red: 0.13, green: 0.16, blue: 0.28)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .shadow(color: selectedLevel.accentColor.opacity(0.22), radius: 10, y: 5)
     }
 
-    // MARK: - Stage Selector Pills
+    // MARK: - Detailed Sub-Exercises for Selected Level
 
-    private var stageSelectorBar: some View {
-        HStack(spacing: 8) {
-            ForEach(TrainingStageKind.allCases) { stage in
-                let isSelected = (stage == selectedStage)
-                Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                        selectedStage = stage
-                    }
-                } label: {
-                    VStack(spacing: 2) {
-                        Text("0\(stage.index)")
-                            .font(.caption2.bold().monospacedDigit())
-                            .opacity(isSelected ? 0.9 : 0.6)
-                        Text(stage.phaseTitle)
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        isSelected ? stage.accentColor : Color(.secondarySystemGroupedBackground),
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    )
-                    .foregroundStyle(isSelected ? .white : .primary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    // MARK: - Horizontal Stage Card
-
-    private func stageCarouselCard(_ stage: TrainingStageKind) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(stage.accentColor.opacity(0.16))
-                            .frame(width: 46, height: 46)
-                        Image(systemName: stage.symbolName)
-                            .font(.title3)
-                            .foregroundStyle(stage.accentColor)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("阶段 \(stage.index) · \(stage.phaseTitle)")
-                            .font(.caption.bold())
-                            .foregroundStyle(stage.accentColor)
-                        Text(stage.exerciseName)
-                            .font(.headline)
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text("\(store.bpm(for: stage))")
-                        .font(.title2.bold().monospacedDigit())
-                        .foregroundStyle(stage.accentColor)
-                    Text("BPM")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            HStack(spacing: 8) {
-                Label("\(stage.durationMinutes) 分钟", systemImage: "timer")
-                Text("·")
-                Text(stage.recommendedBPMText)
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
-
-            Divider()
-
-            Text(stage.coreRequirement)
-                .font(.subheadline)
-                .foregroundStyle(.primary.opacity(0.88))
-                .lineSpacing(4)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 4)
-
+    private var exercisesListSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("左右滑动切换阶段", systemImage: "hand.draw")
+                Text("本阶段详细练习 (\(selectedLevel.exercises.count) 项)")
+                    .font(.subheadline.bold())
+                Spacer()
+                Text("点击进入专注训练")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Spacer()
+            }
+
+            ForEach(Array(selectedLevel.exercises.enumerated()), id: \.element.id) { idx, exercise in
                 Button {
-                    activeSession = .single(stage)
+                    activeSession = .single(exercise)
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.fill")
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Text(exercise.badge)
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(selectedLevel.accentColor.opacity(0.16), in: Capsule())
+                                        .foregroundStyle(selectedLevel.accentColor)
+                                    Text("\(exercise.durationMinutes) 分钟 · \(store.bpm(for: exercise)) BPM")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text("\(idx + 1). \(exercise.name)")
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.primary)
+                            }
+                            Spacer()
+                            Image(systemName: "play.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(selectedLevel.accentColor)
+                        }
+
+                        Text(exercise.steps.first ?? exercise.tip)
                             .font(.caption)
-                        Text("单独练习本阶段")
-                            .font(.subheadline.bold())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(stage.accentColor, in: Capsule())
+                    .padding(14)
+                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(stage.accentColor.opacity(0.22), lineWidth: 1)
-        )
     }
 
-    // MARK: - Compact Bottom Bar & Sheet
+    // MARK: - Stage Proficiency Test CTA
 
-    private var principlesCompactBar: some View {
-        Button {
-            showPrinciplesSheet = true
+    private var stageTestCTACard: some View {
+        let spec = selectedLevel.testSpec
+        return Button {
+            activeTestLevel = selectedLevel
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "ruler.fill")
-                    .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("一毫米原则 · 紧绷降速与提速标准")
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(selectedLevel.accentColor.opacity(0.16))
+                        .frame(width: 46, height: 46)
+                    Image(systemName: spec.usesAudioAnalysis ? "mic.badge.plus" : "trophy.fill")
+                        .font(.title3)
+                        .foregroundStyle(selectedLevel.accentColor)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(spec.usesAudioAnalysis ? "实时麦克风音频考核" : "阶段熟练度考核（免麦克风）")
                         .font(.caption.bold())
+                        .foregroundStyle(selectedLevel.accentColor)
+                    Text(spec.title)
+                        .font(.subheadline.bold())
                         .foregroundStyle(.primary)
-                    Text("点击查看全部核心动作细节")
+                    Text("测出你在 \(selectedLevel.code) 的熟练度百分比与 S/A/B/C 评级")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+
+                Text("去测试")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(selectedLevel.accentColor, in: Capsule())
+                    .foregroundStyle(.white)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(selectedLevel.accentColor.opacity(0.45), lineWidth: 1.5)
+            )
         }
         .buttonStyle(.plain)
     }

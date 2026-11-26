@@ -5,12 +5,12 @@ struct ContentView: View {
         TabView {
             TodayPlanView()
                 .tabItem {
-                    Label("今日训练", systemImage: "guitars.fill")
+                    Label("进阶路径", systemImage: "guitars.fill")
                 }
 
             ProgressAndGuideView()
                 .tabItem {
-                    Label("进度与原则", systemImage: "chart.bar.doc.horizontal.fill")
+                    Label("能力画像", systemImage: "chart.bar.doc.horizontal.fill")
                 }
         }
     }

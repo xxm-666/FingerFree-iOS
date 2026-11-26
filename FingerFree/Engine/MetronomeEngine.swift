@@ -9,6 +9,7 @@ final class MetronomeEngine: ObservableObject {
     @Published private(set) var countInBeat: Int = 0        // 1...4 during count-in
     @Published private(set) var currentBeat: Int = 0        // 1...4 while playing
     @Published private(set) var totalBeatCount: Int = 0     // 1-indexed continuous counter for visualizers
+    @Published private(set) var lastTickTimestamp: CFAbsoluteTime = 0
 
     @Published var bpm: Int = 60 {
         didSet {
@@ -339,6 +340,7 @@ final class MetronomeEngine: ObservableObject {
         }
 
         let nextBeat = (currentBeat % 4) + 1
+        lastTickTimestamp = CFAbsoluteTimeGetCurrent()
         currentBeat = nextBeat
         totalBeatCount += 1
 
