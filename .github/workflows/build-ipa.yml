@@ -43,7 +43,7 @@ jobs:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             build
 
-      - name: Package & verify unsigned IPA
+      - name: Package & verify SideStore-compatible IPA
         id: package
         run: |
           APP_PATH="build/Build/Products/Release-iphoneos/FingerFree.app"
@@ -58,11 +58,19 @@ jobs:
 
           rm -rf output FingerFree-*.ipa
           mkdir -p output/Payload
-          cp -R "$APP_PATH" output/Payload/
-          # Remove code signature residue if any so sideloading tools sign cleanly
-          rm -rf output/Payload/FingerFree.app/_CodeSignature
+          ditto "$APP_PATH" "output/Payload/FingerFree.app"
+
+          # Validate Info.plist and ensure clean Ad-Hoc signature for SideStore / AltStore
+          plutil -lint "output/Payload/FingerFree.app/Info.plist"
+          xattr -cr "output/Payload/FingerFree.app"
+          rm -rf "output/Payload/FingerFree.app/_CodeSignature"
+          codesign --force --deep --sign - --timestamp=none "output/Payload/FingerFree.app"
+          codesign --verify --deep --strict --verbose=2 "output/Payload/FingerFree.app"
+
+          # Pack cleanly without macOS resource forks or .DS_Store
+          find output -name ".DS_Store" -delete
           cd output
-          zip -qr "../${IPA_NAME}" Payload
+          COPYFILE_DISABLE=1 zip -qr "../${IPA_NAME}" Payload
           cd ..
           unzip -t "${IPA_NAME}"
           ls -lh "${IPA_NAME}"
