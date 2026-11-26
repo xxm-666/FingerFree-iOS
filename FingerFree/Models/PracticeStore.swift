@@ -9,6 +9,9 @@ final class PracticeStore: ObservableObject {
     @Published var levelMasteries: [Int: LevelMastery] {
         didSet { saveMasteries() }
     }
+    @Published var chordDrillBestScores: [String: Int] {
+        didSet { saveChordDrillScores() }
+    }
     @Published var records: [PracticeRecord] {
         didSet { saveRecords() }
     }
@@ -27,6 +30,7 @@ final class PracticeStore: ObservableObject {
 
     private static let bpmsKey = "fingerfree_v2_exercise_bpms"
     private static let masteriesKey = "fingerfree_v2_level_masteries"
+    private static let chordDrillScoresKey = "fingerfree_v2_chord_drill_scores"
     private static let recordsKey = "fingerfree_v2_records"
     private static let fChordKey = "fingerfree_f_chord_style_v1"
     private static let hapticsKey = "fingerfree_haptics_enabled_v1"
@@ -64,6 +68,12 @@ final class PracticeStore: ObservableObject {
             self.levelMasteries = decoded
         } else {
             self.levelMasteries = [:]
+        }
+
+        if let savedChordScores = UserDefaults.standard.dictionary(forKey: Self.chordDrillScoresKey) as? [String: Int] {
+            self.chordDrillBestScores = savedChordScores
+        } else {
+            self.chordDrillBestScores = [:]
         }
 
         if let data = UserDefaults.standard.data(forKey: Self.recordsKey),
@@ -198,9 +208,77 @@ final class PracticeStore: ObservableObject {
         return "需先完成主线 Lv.2 基础定型考核达 B 级（65%），或直接参加和弦跳级考核"
     }
 
+    func chordDrillBestScore(for exercise: ExerciseItem) -> Int {
+        if let saved = chordDrillBestScores[exercise.id] {
+            return saved
+        }
+        // Backward compatibility: if user already passed the legacy chord test before v2.5, credit drill #1
+        if exercise.id == "lv5_camfg" && mastery(for: .chords).bestScore >= Self.unlockScoreThreshold {
+            return mastery(for: .chords).bestScore
+        }
+        return 0
+    }
+
+    /// Per-exercise unlock check: main-track exercises follow their stage lock; Chord Lab drills unlock sequentially one by one (B rank >= 65% or jump-test).
+    func isExerciseUnlocked(_ exercise: ExerciseItem) -> Bool {
+        guard exercise.level == .chords else {
+            return isUnlocked(exercise.level)
+        }
+        let threshold = Self.unlockScoreThreshold
+        let drills = TrainingLevel.chords.exercises
+        guard let idx = drills.firstIndex(of: exercise) else { return false }
+
+        if chordDrillBestScore(for: exercise) >= threshold {
+            return true
+        }
+        // Jump-testing any later chord drill unlocks earlier chord drills too
+        if drills.dropFirst(idx + 1).contains(where: { chordDrillBestScore(for: $0) >= threshold }) {
+            return true
+        }
+        if idx == 0 {
+            return isUnlocked(.chords)
+        }
+        let prev = drills[idx - 1]
+        return chordDrillBestScore(for: prev) >= threshold
+    }
+
+    func exerciseLockReason(for exercise: ExerciseItem) -> String? {
+        guard !isExerciseUnlocked(exercise) else { return nil }
+        guard exercise.level == .chords else {
+            return lockReason(for: exercise.level)
+        }
+        let drills = TrainingLevel.chords.exercises
+        guard let idx = drills.firstIndex(of: exercise) else { return nil }
+        if idx == 0 {
+            return lockReason(for: .chords)
+        }
+        let prev = drills[idx - 1]
+        return "需先完成上一套和弦「\(prev.name)」考核达 B 级（65%），或直接参加本套和弦跳级考核"
+    }
+
+    func unlockedExercises(for level: TrainingLevel) -> [ExerciseItem] {
+        level.exercises.filter { isExerciseUnlocked($0) }
+    }
+
+    /// Next chord drill to test (the first unlocked chord drill not yet at B rank, or the latest unlocked drill).
+    var nextChordTestExercise: ExerciseItem {
+        let drills = TrainingLevel.chords.exercises
+        let unlocked = unlockedExercises(for: .chords)
+        if let pending = unlocked.first(where: { chordDrillBestScore(for: $0) < Self.unlockScoreThreshold }) {
+            return pending
+        }
+        return unlocked.last ?? drills[0]
+    }
+
     @discardableResult
-    func recordTestResult(for level: TrainingLevel, score: Int, tier: TestSpeedTier) -> [TrainingLevel] {
-        let unlockedBefore = Set(TrainingLevel.displayOrder.filter { isUnlocked($0) })
+    func recordTestResult(
+        for level: TrainingLevel,
+        exercise: ExerciseItem? = nil,
+        score: Int,
+        tier: TestSpeedTier
+    ) -> [String] {
+        let unlockedLevelsBefore = Set(TrainingLevel.displayOrder.filter { isUnlocked($0) })
+        let unlockedChordIdsBefore = Set(TrainingLevel.chords.exercises.filter { isExerciseUnlocked($0) }.map(\.id))
 
         let rank = ProficiencyRank.from(score: score)
         var current = mastery(for: level)
@@ -213,8 +291,20 @@ final class PracticeStore: ObservableObject {
         current.lastTestedDate = Date()
         levelMasteries[level.rawValue] = current
 
+        let testedEx = exercise ?? level.testSpec.exercise
+        if level == .chords {
+            let prevBest = chordDrillBestScores[testedEx.id] ?? 0
+            if score >= prevBest {
+                chordDrillBestScores[testedEx.id] = score
+            }
+        }
+
+        let recordTitle = (level == .chords)
+            ? "和弦考核 · \(testedEx.name)"
+            : "\(level.code) \(level.title)考核"
+
         let record = PracticeRecord(
-            title: "\(level.code) \(level.title)考核",
+            title: recordTitle,
             durationSeconds: level.testSpec.durationSeconds,
             badgeText: "\(score)% · \(rank.rawValue)级 (\(tier.bpm) BPM)",
             isTest: true,
@@ -222,27 +312,37 @@ final class PracticeStore: ObservableObject {
         )
         addRecord(record)
 
-        return TrainingLevel.displayOrder.filter { !unlockedBefore.contains($0) && isUnlocked($0) }
+        var newlyUnlockedNames: [String] = []
+        for lv in TrainingLevel.displayOrder where !unlockedLevelsBefore.contains(lv) && isUnlocked(lv) {
+            newlyUnlockedNames.append(lv.isMainTrack ? "\(lv.code) \(lv.title)" : lv.title)
+        }
+        for drill in TrainingLevel.chords.exercises where !unlockedChordIdsBefore.contains(drill.id) && isExerciseUnlocked(drill) {
+            // Avoid duplicating drill #1 when the whole Chord Lab just unlocked via Lv.2
+            if !(drill.id == "lv5_camfg" && !unlockedLevelsBefore.contains(.chords)) {
+                newlyUnlockedNames.append(drill.name)
+            }
+        }
+        return newlyUnlockedNames
     }
 
     func addRecord(_ record: PracticeRecord) {
         records.insert(record, at: 0)
     }
 
-    /// Recommends today's focus level & concrete next action strictly among unlocked stages.
+    /// Recommends today's focus level & concrete next action strictly among unlocked stages and unlocked exercises.
     var dailyRecommendation: DailyRecommendation {
         let unlockedLevels = TrainingLevel.displayOrder.filter { isUnlocked($0) }
-        // Prioritize first unlocked stage not yet at B rank (to unlock next), else first below A rank, else latest unlocked
         let focusLevel = unlockedLevels.first { mastery(for: $0).bestScore < Self.unlockScoreThreshold }
             ?? unlockedLevels.first { mastery(for: $0).bestScore < 80 }
             ?? unlockedLevels.last
             ?? .lv1
 
         let m = mastery(for: focusLevel)
-        let exercises = focusLevel.exercises
-        let targetExercise = exercises.min { a, b in
+        let exercises = unlockedExercises(for: focusLevel)
+        let candidateExercises = exercises.isEmpty ? focusLevel.exercises : exercises
+        let targetExercise = candidateExercises.min { a, b in
             (bpm(for: a) - a.defaultBPM) < (bpm(for: b) - b.defaultBPM)
-        } ?? exercises[0]
+        } ?? candidateExercises[0]
 
         let practicedFocusRecently = records.prefix(5).contains {
             !$0.isTest && ($0.title.contains(focusLevel.code) || $0.title.contains(focusLevel.title))
@@ -323,6 +423,10 @@ final class PracticeStore: ObservableObject {
         if let encoded = try? JSONEncoder().encode(levelMasteries) {
             UserDefaults.standard.set(encoded, forKey: Self.masteriesKey)
         }
+    }
+
+    private func saveChordDrillScores() {
+        UserDefaults.standard.set(chordDrillBestScores, forKey: Self.chordDrillScoresKey)
     }
 
     private func saveRecords() {

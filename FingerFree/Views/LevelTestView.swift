@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LevelTestView: View {
     let level: TrainingLevel
+    var customExercise: ExerciseItem? = nil
     @EnvironmentObject private var store: PracticeStore
     @Environment(\.dismiss) private var dismiss
 
@@ -24,13 +25,13 @@ struct LevelTestView: View {
     @State private var finalRank: ProficiencyRank = .unranked
     @State private var lastAudioSummary: AudioTestMetrics? = nil
     @State private var appliedTestSpeedAdjustment: Bool = false
-    @State private var newlyUnlockedLevels: [TrainingLevel] = []
+    @State private var newlyUnlockedNames: [String] = []
 
     private let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var spec: LevelTestSpec { level.testSpec }
     private var selectedTier: TestSpeedTier { spec.tiers[min(selectedTierIndex, spec.tiers.count - 1)] }
-    private var testExercise: ExerciseItem { spec.exercise }
+    private var testExercise: ExerciseItem { customExercise ?? spec.exercise }
 
     private var currentTargetNoteLabel: String {
         if level.isChordAudioTest {
@@ -121,17 +122,19 @@ struct LevelTestView: View {
                     .font(.caption.bold().monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            if !store.isUnlocked(level) && finalScore == nil {
-                Label("跳级考核模式 · 达到 B 级（65%）立即解锁本阶段", systemImage: "lock.open.fill")
+            if !store.isExerciseUnlocked(testExercise) && finalScore == nil {
+                Label("跳级考核模式 · 达到 B 级（65%）立即解锁本项", systemImage: "lock.open.fill")
                     .font(.caption2.bold())
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Color.orange.opacity(0.16), in: Capsule())
                     .foregroundStyle(.orange)
             }
-            Text(spec.title)
+            Text(customExercise != nil ? "和弦考核 · \(testExercise.name)" : spec.title)
                 .font(.headline)
-            Text(spec.requirement)
+            Text(customExercise != nil
+                 ? "每四拍切换一次和弦，麦克风通过 FFT 多频段实时检测第 1 拍换和弦准点率与和弦音色饱满度。"
+                 : spec.requirement)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineSpacing(3)
@@ -443,12 +446,12 @@ struct LevelTestView: View {
                 }
             }
 
-            if !newlyUnlockedLevels.isEmpty {
-                let names = newlyUnlockedLevels.map { "\($0.code) \($0.title)" }.joined(separator: "、")
+            if !newlyUnlockedNames.isEmpty {
+                let names = newlyUnlockedNames.joined(separator: "、")
                 HStack(spacing: 8) {
                     Image(systemName: "lock.open.fill")
                         .font(.subheadline.bold())
-                    Text("已解锁新阶段：\(names)")
+                    Text("已解锁：\(names)")
                         .font(.subheadline.bold())
                 }
                 .foregroundStyle(.white)
@@ -471,10 +474,10 @@ struct LevelTestView: View {
             if rank == .s {
                 if !appliedTestSpeedAdjustment {
                     Button {
-                        store.speedUp(exercises: level.exercises, by: 5)
+                        store.speedUp(exercises: customExercise.map { [$0] } ?? level.exercises, by: 5)
                         appliedTestSpeedAdjustment = true
                     } label: {
-                        Label("一键将 \(level.code) 全部练习目标 +5 BPM", systemImage: "arrow.up.circle.fill")
+                        Label(customExercise != nil ? "一键将本套和弦目标 +5 BPM" : "一键将 \(level.code) 全部练习目标 +5 BPM", systemImage: "arrow.up.circle.fill")
                             .font(.subheadline.bold())
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -483,17 +486,17 @@ struct LevelTestView: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Label("已将 \(level.code) 全部练习目标提速 +5 BPM", systemImage: "checkmark.circle.fill")
+                    Label("已将练习目标提速 +5 BPM", systemImage: "checkmark.circle.fill")
                         .font(.caption.bold())
                         .foregroundStyle(.green)
                 }
             } else if rank == .c {
                 if !appliedTestSpeedAdjustment {
                     Button {
-                        store.speedUp(exercises: level.exercises, by: -10)
+                        store.speedUp(exercises: customExercise.map { [$0] } ?? level.exercises, by: -10)
                         appliedTestSpeedAdjustment = true
                     } label: {
-                        Label("一键将 \(level.code) 练习目标降速 -10 BPM", systemImage: "arrow.down.circle.fill")
+                        Label(customExercise != nil ? "一键将本套和弦目标 -10 BPM" : "一键将 \(level.code) 练习目标降速 -10 BPM", systemImage: "arrow.down.circle.fill")
                             .font(.subheadline.bold())
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -502,7 +505,7 @@ struct LevelTestView: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Label("已将 \(level.code) 练习目标下调 -10 BPM", systemImage: "checkmark.circle.fill")
+                    Label("已将练习目标下调 -10 BPM", systemImage: "checkmark.circle.fill")
                         .font(.caption.bold())
                         .foregroundStyle(.orange)
                 }
@@ -549,7 +552,7 @@ struct LevelTestView: View {
         manualLinkages = 0
         noForearmTension = false
         appliedTestSpeedAdjustment = false
-        newlyUnlockedLevels = []
+        newlyUnlockedNames = []
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil
@@ -631,7 +634,7 @@ struct LevelTestView: View {
         finalScore = clamped
         finalRank = rank
         showPostCheck = false
-        newlyUnlockedLevels = store.recordTestResult(for: level, score: clamped, tier: selectedTier)
+        newlyUnlockedNames = store.recordTestResult(for: level, exercise: testExercise, score: clamped, tier: selectedTier)
     }
 
     private func resetTestState() {
@@ -641,7 +644,7 @@ struct LevelTestView: View {
         manualLinkages = 0
         noForearmTension = false
         appliedTestSpeedAdjustment = false
-        newlyUnlockedLevels = []
+        newlyUnlockedNames = []
         finalScore = nil
         showPostCheck = false
         lastAudioSummary = nil

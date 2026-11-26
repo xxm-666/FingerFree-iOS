@@ -9,11 +9,23 @@ struct TodayPlanView: View {
         var id: String { rawValue }
     }
 
+    private struct TestLaunchConfig: Identifiable {
+        let id = UUID()
+        let level: TrainingLevel
+        let customExercise: ExerciseItem?
+    }
+
+    private struct LockedPromptItem {
+        let level: TrainingLevel
+        let exercise: ExerciseItem?
+        let message: String
+    }
+
     @State private var selectedTrack: TrainingTrack = .main
     @State private var selectedMainLevel: TrainingLevel = .lv1
     @State private var activeSession: PracticeSessionConfig?
-    @State private var activeTestLevel: TrainingLevel?
-    @State private var lockedPromptLevel: TrainingLevel?
+    @State private var activeTest: TestLaunchConfig?
+    @State private var lockedPrompt: LockedPromptItem?
     @State private var showPrinciplesSheet: Bool = false
 
     private var currentLevel: TrainingLevel {
@@ -61,27 +73,27 @@ struct TodayPlanView: View {
                 PracticeSessionView(config: config)
                     .environmentObject(store)
             }
-            .fullScreenCover(item: $activeTestLevel) { level in
-                LevelTestView(level: level)
+            .fullScreenCover(item: $activeTest) { cfg in
+                LevelTestView(level: cfg.level, customExercise: cfg.customExercise)
                     .environmentObject(store)
             }
             .alert(
-                "该阶段尚未解锁",
+                "尚未解锁",
                 isPresented: Binding(
-                    get: { lockedPromptLevel != nil },
-                    set: { if !$0 { lockedPromptLevel = nil } }
+                    get: { lockedPrompt != nil },
+                    set: { if !$0 { lockedPrompt = nil } }
                 ),
-                presenting: lockedPromptLevel
-            ) { lv in
-                Button("直接跳级考核") {
-                    lockedPromptLevel = nil
-                    activeTestLevel = lv
+                presenting: lockedPrompt
+            ) { item in
+                Button(item.exercise != nil ? "跳级考核本套和弦" : "直接跳级考核") {
+                    lockedPrompt = nil
+                    activeTest = TestLaunchConfig(level: item.level, customExercise: item.exercise)
                 }
                 Button("知道了", role: .cancel) {
-                    lockedPromptLevel = nil
+                    lockedPrompt = nil
                 }
-            } message: { lv in
-                Text(store.lockReason(for: lv) ?? "完成前置阶段考核达 B 级（65%）后解锁，或直接参加跳级考核。")
+            } message: { item in
+                Text(item.message)
             }
             .sheet(isPresented: $showPrinciplesSheet) {
                 principlesSheet
@@ -102,7 +114,10 @@ struct TodayPlanView: View {
                 selectedTrack = .chords
             }
             if rec.shouldTakeTest {
-                activeTestLevel = rec.level
+                activeTest = TestLaunchConfig(
+                    level: rec.level,
+                    customExercise: rec.level == .chords ? store.nextChordTestExercise : nil
+                )
             } else {
                 activeSession = .single(rec.exercise)
             }
@@ -227,9 +242,14 @@ struct TodayPlanView: View {
         let level = currentLevel
         let unlocked = store.isUnlocked(level)
         let m = store.mastery(for: level)
-        let totalMins = level.exercises.reduce(0) { $0 + $1.durationMinutes }
+        let playableExercises = store.unlockedExercises(for: level)
+        let totalMins = playableExercises.reduce(0) { $0 + $1.durationMinutes }
+
         let masteryLabel: String = {
             if !unlocked { return "🔒 未解锁" }
+            if level == .chords {
+                return "已解锁 \(playableExercises.count)/\(level.exercises.count) 套"
+            }
             if m.bestScore == 0 { return "尚未考核" }
             if m.lastScore != m.bestScore {
                 return "最高 \(m.bestScore)% · 最近 \(m.lastScore)%"
@@ -259,17 +279,24 @@ struct TodayPlanView: View {
                 .opacity(0.92)
                 .lineSpacing(3)
 
-            if unlocked {
+            if unlocked && !playableExercises.isEmpty {
                 Button {
-                    activeSession = .fullLevel(level)
+                    activeSession = PracticeSessionConfig(
+                        exercises: playableExercises,
+                        title: level.isMainTrack
+                            ? "\(level.code) \(level.title) · 全套连练"
+                            : "和弦实战 · 已解锁连练"
+                    )
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "play.fill")
                             .font(.caption)
-                        Text(level.isMainTrack ? "一键连练本阶段全部练习" : "一键连练全部 6 套和弦实战")
+                        Text(level.isMainTrack
+                             ? "一键连练本阶段全部练习"
+                             : "一键连练已解锁和弦 (\(playableExercises.count)/\(level.exercises.count))")
                             .font(.subheadline.bold())
                         Spacer()
-                        Text("\(level.exercises.count) 项 · \(totalMins) 分钟")
+                        Text("\(playableExercises.count) 项 · \(totalMins) 分钟")
                             .font(.caption2.bold().monospacedDigit())
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -291,7 +318,10 @@ struct TodayPlanView: View {
                     }
 
                     Button {
-                        activeTestLevel = level
+                        activeTest = TestLaunchConfig(
+                            level: level,
+                            customExercise: level == .chords ? level.exercises.first : nil
+                        )
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "lock.open.fill")
@@ -333,60 +363,100 @@ struct TodayPlanView: View {
 
     private var exercisesListSection: some View {
         let level = currentLevel
-        let unlocked = store.isUnlocked(level)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(level.isMainTrack ? "本阶段详细练习 (\(level.exercises.count) 项)" : "渐进和弦实战课程 (\(level.exercises.count) 项 · 由易到难)")
+                Text(level.isMainTrack
+                     ? "本阶段详细练习 (\(level.exercises.count) 项)"
+                     : "渐进和弦实战课程 (逐套考核达 B 级依次解锁)")
                     .font(.subheadline.bold())
                 Spacer()
-                Text(unlocked ? "点击进入专注训练" : "预览模式 · 解锁后开练")
+                Text(level.isMainTrack ? (store.isUnlocked(level) ? "点击专注训练" : "预览模式") : "由易到难")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
             ForEach(Array(level.exercises.enumerated()), id: \.element.id) { idx, exercise in
-                Button {
-                    if unlocked {
-                        activeSession = .single(exercise)
-                    } else {
-                        lockedPromptLevel = level
-                    }
-                } label: {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
-                                    Text(exercise.badge)
-                                        .font(.caption2.bold())
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background((unlocked ? level.accentColor : Color.secondary).opacity(0.16), in: Capsule())
-                                        .foregroundStyle(unlocked ? level.accentColor : .secondary)
-                                    Text("\(exercise.durationMinutes) 分钟 · \(store.bpm(for: exercise)) BPM")
-                                        .font(.caption2.monospacedDigit())
-                                        .foregroundStyle(.secondary)
-                                }
-                                Text("\(idx + 1). \(exercise.name)")
-                                    .font(.subheadline.bold())
-                                    .foregroundStyle(unlocked ? .primary : .secondary)
-                            }
-                            Spacer()
-                            Image(systemName: unlocked ? "play.circle.fill" : "lock.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(unlocked ? level.accentColor : .secondary.opacity(0.6))
-                        }
+                let exUnlocked = store.isExerciseUnlocked(exercise)
+                let chordScore = level == .chords ? store.chordDrillBestScore(for: exercise) : 0
 
-                        Text(exercise.steps.first ?? exercise.tip)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        if exUnlocked {
+                            activeSession = .single(exercise)
+                        } else {
+                            lockedPrompt = LockedPromptItem(
+                                level: level,
+                                exercise: level == .chords ? exercise : nil,
+                                message: store.exerciseLockReason(for: exercise) ?? "完成前置考核达 B 级（65%）解锁。"
+                            )
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Text(exercise.badge)
+                                            .font(.caption2.bold())
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background((exUnlocked ? level.accentColor : Color.secondary).opacity(0.16), in: Capsule())
+                                            .foregroundStyle(exUnlocked ? level.accentColor : .secondary)
+                                        Text("\(exercise.durationMinutes) 分钟 · \(store.bpm(for: exercise)) BPM")
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                        if level == .chords && chordScore > 0 {
+                                            Text("\(chordScore)%")
+                                                .font(.caption2.bold().monospacedDigit())
+                                                .foregroundStyle(chordScore >= PracticeStore.unlockScoreThreshold ? .green : .orange)
+                                        }
+                                    }
+                                    Text("\(idx + 1). \(exercise.name)")
+                                        .font(.subheadline.bold())
+                                        .foregroundStyle(exUnlocked ? .primary : .secondary)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer()
+                                Image(systemName: exUnlocked ? "play.circle.fill" : "lock.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(exUnlocked ? level.accentColor : .secondary.opacity(0.6))
+                            }
+
+                            Text(exercise.steps.first ?? exercise.tip)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
                     }
-                    .padding(14)
-                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .opacity(unlocked ? 1.0 : 0.78)
+                    .buttonStyle(.plain)
+
+                    // For Chord Lab: give each unlocked drill a direct mini test button to unlock the next chord tier
+                    if level == .chords && exUnlocked {
+                        HStack {
+                            Text(chordScore >= PracticeStore.unlockScoreThreshold
+                                 ? "已通过 B 级考核（最高 \(chordScore)%）"
+                                 : (idx + 1 < level.exercises.count ? "考核达 B 级 (65%) 解锁下一套和弦" : "考核验收大师级和弦掌控"))
+                                .font(.caption2)
+                                .foregroundStyle(chordScore >= PracticeStore.unlockScoreThreshold ? .green : .secondary)
+                            Spacer()
+                            Button {
+                                activeTest = TestLaunchConfig(level: .chords, customExercise: exercise)
+                            } label: {
+                                Label(chordScore > 0 ? "复测" : "考核本套", systemImage: "mic.fill")
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(level.accentColor.opacity(0.14), in: Capsule())
+                                    .foregroundStyle(level.accentColor)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.top, 2)
+                    }
                 }
-                .buttonStyle(.plain)
+                .padding(14)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .opacity(exUnlocked ? 1.0 : 0.78)
             }
         }
     }
@@ -397,8 +467,10 @@ struct TodayPlanView: View {
         let level = currentLevel
         let unlocked = store.isUnlocked(level)
         let spec = level.testSpec
+        let targetChordDrill: ExerciseItem? = (level == .chords) ? store.nextChordTestExercise : nil
+
         return Button {
-            activeTestLevel = level
+            activeTest = TestLaunchConfig(level: level, customExercise: targetChordDrill)
         } label: {
             HStack(spacing: 12) {
                 ZStack {
@@ -416,11 +488,12 @@ struct TodayPlanView: View {
                          : "跳级考核通道（达 B 级 65% 即刻解锁）")
                         .font(.caption.bold())
                         .foregroundStyle(unlocked ? level.accentColor : .orange)
-                    Text(spec.title)
+                    Text(targetChordDrill != nil ? "和弦考核 · \(targetChordDrill!.name)" : spec.title)
                         .font(.subheadline.bold())
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
                     Text(unlocked
-                         ? "测出你在 \(level.code) 的熟练度百分比，达 B 级解锁下一阶段"
+                         ? (level == .chords ? "完成当前套和弦考核达 B 级解锁下一套" : "测出你在 \(level.code) 的熟练度百分比，达 B 级解锁下一阶段")
                          : "有基础的琴友可直接参加本阶段考核解锁")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
