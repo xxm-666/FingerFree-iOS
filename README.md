@@ -18,17 +18,13 @@
 - **每周提速自检（+5 BPM 标准）**：训练结束弹出打卡与自检表单（连续 2 分钟零失误 + 手背前臂无酸胀），达标后可一键将各阶段目标速度 `+5 BPM`。
 - **一毫米原则与黄金时段提醒**：训练全程防息屏，内置动作规范速查与历史打卡天数统计。
 
-## GitHub Actions 自动构建 IPA
+## 下载并安装到 iPhone
 
-本项目使用 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`project.yml`) 自动生成工程，无需提交 `.xcodeproj`。
+1. 打开 [GitHub Releases](https://github.com/xxm-666/FingerFree-iOS/releases/latest)，在 **Assets** 下下载 `FingerFree-v<版本号>-unsigned.ipa`（例如 `FingerFree-v2.5.1-unsigned.ipa`）。直接下载 `.ipa` 即可，无需解压，也不用下载 `Source code (zip)`。
+2. 下载的是未签名 IPA，请用 **AltStore**、**SideStore** 或 **Sideloadly** 签名并安装。已安装 **TrollStore（巨魔）** 的兼容设备也可用它安装。
 
-1. 每次推送到 `main` 分支，或在仓库 **Actions** 页面手动点击 **Run workflow**，会自动在 macOS Runner 上编译并产出 `FingerFree-unsigned.ipa`。
-2. 在对应 Workflow Run 底部的 **Artifacts** 中下载 `FingerFree-unsigned-ipa.zip` 并解压即可获得 `.ipa`。
-3. 如推送 `v*` 标签（如 `git tag v1.0.0 && git push --tags`），还会自动创建 GitHub Release 并附带 `.ipa` 下载链接。
+### GitHub Actions 构建产物
 
-### 如何安装到 iPhone
+如果要测试某次提交，请在 **Actions** 中打开对应的成功构建，从 **Artifacts** 下载 `FingerFree-v<版本号>-unsigned-ipa`，解压后取出其中的 `.ipa`。推送到 `main` 或 `feat/*` 分支、推送 `v*` 标签，或手动运行工作流，均可触发构建。
 
-本工作流产出的是**无签名 IPA**，可通过以下任一工具签名安装到你的 iPhone：
-- **AltStore / SideStore**（免费 Apple ID 即可）
-- **Sideloadly**（Windows / macOS 连接数据线安装）
-- **TrollStore（巨魔）**（支持设备可直接永久安装）
+本项目使用 [XcodeGen](https://github.com/yonaskolb/XcodeGen) 根据 `project.yml` 生成 Xcode 工程，无需提交 `.xcodeproj`。
